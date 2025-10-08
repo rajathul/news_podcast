@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>News Feed Viewer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+</head>
+<body data-theme="dark">
+    <div class="page-shell">
+        <header class="hero">
+            <div class="hero__badge">Live RSS Blend</div>
+            <h1 class="hero__title">
+                News Feed Viewer
+            </h1>
+            <p class="hero__subtitle">
+                Build a multi-source bulletin in a brutalist shell. Light or dark, your brief stays sharp.
+            </p>
+            <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">
+                <span class="theme-toggle__icon" aria-hidden="true"></span>
+                <span class="theme-toggle__label">Switch to light</span>
+            </button>
+        </header>
+
+        <main class="content">
+            <section class="controls">
+                <div class="control-group">
+                    <label class="control-label" for="searchInput">Search headlines</label>
+                    <div class="control-field">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.71.71l.27.28v.79l5 5 1.5-1.5-5-5zM10.5 15a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/>
+                        </svg>
+                        <input id="searchInput" type="search" placeholder="Find a story, topic, or author…" autocomplete="off">
+                        <button type="button" class="history-button" id="historyButton" aria-haspopup="true" aria-expanded="false" aria-controls="historyPopup" title="Search history">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M13 3a9 9 0 1 0 8.95 9.78l-1.99-.2A7 7 0 1 1 13 5V3zm1 2h-1v7l5.25 3.15.75-1.23-4-2.37V5z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <span class="control-label">Sort</span>
+                    <div class="pill-toggle" role="radiogroup">
+                        <button class="pill-toggle__option is-active" data-sort="latest" aria-pressed="true">Latest first</button>
+                        <button class="pill-toggle__option" data-sort="original" aria-pressed="false">Feed order</button>
+                    </div>
+                </div>
+                <div class="control-group control-group--actions">
+                    <span class="control-label">Sources</span>
+                    <div class="add-feed">
+                        <button type="button" class="add-feed__toggle" id="addFeedButton">
+                            <span>Add feed source</span>
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M19 11h-6V5h-2v6H5v2h6v6h2v-6h6z"/>
+                            </svg>
+                        </button>
+                        <form class="add-feed__form" id="addFeedForm" hidden>
+                            <label class="visually-hidden" for="feedInput">RSS feed URL</label>
+                            <input id="feedInput" type="url" placeholder="https://example.com/feed.xml" required spellcheck="false">
+                            <div class="add-feed__actions">
+                                <button type="submit" class="add-feed__submit">Add feed</button>
+                                <button type="button" class="add-feed__cancel" id="cancelAddFeed">Cancel</button>
+                            </div>
+                            <p class="add-feed__hint">Accepts any public RSS/Atom link.</p>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <div class="layout">
+                <section class="feed-panel">
+                    <section class="meta">
+                        <div class="meta__status" id="statusHeadline">
+                            Loading fresh headlines…
+                        </div>
+                        <div class="meta__sources" id="sourcesList"></div>
+                        <time class="meta__timestamp" id="lastRefreshed" datetime=""></time>
+                        <button class="refresh-button" id="refreshButton">
+                            <span>Refresh now</span>
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M12 6V4l-4 4 4 4V10c2.21 0 4 1.79 4 4a4 4 0 1 1-7.9-1H6.02A6 6 0 1 0 12 6z"/>
+                            </svg>
+                        </button>
+                    </section>
+
+                    <section class="panels" id="articlePanels" aria-live="polite">
+                        <section class="panel panel--loading">
+                            <div class="panel__header">
+                                <span class="panel__eyebrow">Featured stories</span>
+                                <h3 class="panel__title">Loading highlights</h3>
+                            </div>
+                            <div class="panel__grid">
+                                <article class="card skeleton">
+                                    <div class="card__media skeleton__block"></div>
+                                    <div class="card__body">
+                                        <div class="skeleton__line"></div>
+                                        <div class="skeleton__line short"></div>
+                                        <div class="skeleton__line tiny"></div>
+                                    </div>
+                                </article>
+                                <article class="card skeleton">
+                                    <div class="card__media skeleton__block"></div>
+                                    <div class="card__body">
+                                        <div class="skeleton__line"></div>
+                                        <div class="skeleton__line short"></div>
+                                        <div class="skeleton__line tiny"></div>
+                                    </div>
+                                </article>
+                                <article class="card skeleton">
+                                    <div class="card__media skeleton__block"></div>
+                                    <div class="card__body">
+                                        <div class="skeleton__line"></div>
+                                        <div class="skeleton__line short"></div>
+                                        <div class="skeleton__line tiny"></div>
+                                    </div>
+                                </article>
+                                <article class="card skeleton">
+                                    <div class="card__media skeleton__block"></div>
+                                    <div class="card__body">
+                                        <div class="skeleton__line"></div>
+                                        <div class="skeleton__line short"></div>
+                                        <div class="skeleton__line tiny"></div>
+                                    </div>
+                                </article>
+                            </div>
+                        </section>
+                    </section>
+
+                    <section class="empty-state" id="emptyState" hidden>
+                        <div class="empty-state__chip">No matches</div>
+                        <h2>We couldn’t find anything for your search.</h2>
+                        <p>Try a different keyword or clear your filters to explore more stories.</p>
+                    </section>
+
+                    <section class="error-state" id="errorState" hidden>
+                        <div class="error-state__content">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M11 7h2v6h-2zm0 8h2v2h-2z"/>
+                                <path d="M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10 10-4.49 10-10S17.51 2 12 2zm0 18c-4.41 0-8-3.58-8-8s3.59-8 8-8c4.42 0 8 3.58 8 8s-3.58 8-8 8z"/>
+                            </svg>
+                            <div>
+                                <h2>Something went wrong</h2>
+                                <p>Our newsroom data stream is temporarily unavailable. Try refreshing or come back shortly.</p>
+                            </div>
+                        </div>
+                    </section>
+                </section>
+
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>Powered by your curated RSS headlines • Crafted with FastAPI</p>
+        </footer>
+    </div>
+
+    <div class="history-popup" id="historyPopup" role="dialog" aria-labelledby="historyTitle" aria-modal="false" hidden>
+        <div class="history-popup__surface">
+            <header class="history-popup__header">
+                <h2 id="historyTitle">Search history</h2>
+                <button type="button" class="history-popup__close" id="historyCloseButton" aria-label="Close history"></button>
+            </header>
+            <ul class="history-popup__list" id="historyList"></ul>
+            <footer class="history-popup__footer">
+                <button type="button" class="history-popup__clear" id="historyClearButton">Clear history</button>
+            </footer>
+        </div>
+    </div>
+
+    <script type="module" src="{{ url_for('static', path='app.js') }}"></script>
+</body>
+</html>
