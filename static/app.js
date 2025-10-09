@@ -32,8 +32,7 @@ const audioPlayer = document.getElementById("panelAudioPlayer");
 const audioPlayerShell = document.getElementById("panelAudioPlayerShell");
 const audioPlayerTitle = document.getElementById("panelAudioPlayerTitle");
 const audioPlayerStatus = document.getElementById("panelAudioPlayerStatus");
-const audioPlayControl = document.getElementById("audioPlayControl");
-const audioPauseControl = document.getElementById("audioPauseControl");
+const audioToggleControl = document.getElementById("audioToggleControl");
 const audioStopControl = document.getElementById("audioStopControl");
 const audioCloseControl = document.getElementById("audioCloseControl");
 const floatingHeading = document.createElement("div");
@@ -91,20 +90,8 @@ if (audioPlayer) {
     audioPlayer.addEventListener("loadedmetadata", updateAudioPlayerStatusText);
 }
 
-if (audioPlayControl) {
-    audioPlayControl.addEventListener("click", () => {
-        if (!audioPlayer) return;
-        audioPlayer.play().catch(error => {
-            console.warn("Unable to resume playback:", error);
-        });
-    });
-}
-
-if (audioPauseControl) {
-    audioPauseControl.addEventListener("click", () => {
-        if (!audioPlayer) return;
-        audioPlayer.pause();
-    });
+if (audioToggleControl) {
+    audioToggleControl.addEventListener("click", handleAudioToggleControl);
 }
 
 if (audioStopControl) {
@@ -473,13 +460,16 @@ function playPanelAudio(feedUrl, status, titleLabel) {
         audioPlayer.dataset.feedTitle = titleLabel;
     }
     openAudioPlayerShell(feedUrl, titleLabel);
+    updateAudioToggleControl(false, true);
     audioPlayer
         .play()
         .then(() => {
             setCurrentAudioFeed(feedUrl);
+            updateAudioPlayerStatusText();
         })
         .catch(error => {
             console.warn("Unable to start audio playback:", error);
+            updateAudioToggleControl(false, Boolean(audioPlayer.src));
         });
 }
 
@@ -489,6 +479,44 @@ function resolveAudioSourceUrl(status) {
     }
     const cacheBust = status.updated_at ? `?v=${status.updated_at}` : "";
     return `${status.audio_url}${cacheBust}`;
+}
+
+function updateAudioToggleControl(isPlaying, hasSource) {
+    if (!audioToggleControl) {
+        return;
+    }
+    audioToggleControl.textContent = isPlaying ? "Pause" : "Play";
+    audioToggleControl.dataset.state = isPlaying ? "pause" : "play";
+    audioToggleControl.disabled = !hasSource;
+}
+
+function handleAudioToggleControl() {
+    if (!audioPlayer) {
+        return;
+    }
+    const hasSource = Boolean(audioPlayer.src);
+    if (!hasSource) {
+        const fallbackFeed = audioPlayer.dataset.feedUrl || state.currentAudioFeed;
+        if (fallbackFeed) {
+            const status = state.audioStatuses.get(fallbackFeed);
+            if (status && status.audio_url) {
+                playPanelAudio(fallbackFeed, status, getAudioTitle(fallbackFeed));
+            }
+        }
+        return;
+    }
+    if (audioPlayer.paused || audioPlayer.ended) {
+        audioPlayer
+            .play()
+            .then(() => {
+                updateAudioPlayerStatusText();
+            })
+            .catch(error => {
+                console.warn("Unable to resume playback:", error);
+            });
+    } else {
+        audioPlayer.pause();
+    }
 }
 
 function openAudioPlayerShell(feedUrl, titleLabel) {
@@ -505,6 +533,7 @@ function openAudioPlayerShell(feedUrl, titleLabel) {
     }
     audioPlayerShell.hidden = false;
     updateAudioPlayerStatusText();
+    updateAudioToggleControl(!audioPlayer?.paused && !audioPlayer?.ended, Boolean(audioPlayer?.src));
 }
 
 function hideAudioPlayerShell() {
@@ -530,6 +559,7 @@ function updateAudioPlayerStatusText() {
                 ? "Paused"
                 : "Ready";
     audioPlayerStatus.textContent = `${statusLabel} • ${current} / ${duration}`;
+    updateAudioToggleControl(isPlaying, Boolean(audioPlayer.src));
 }
 
 function formatClockTime(seconds) {
@@ -548,7 +578,12 @@ function stopAudioPlayback() {
     }
     audioPlayer.pause();
     audioPlayer.currentTime = 0;
+    audioPlayer.removeAttribute("src");
+    audioPlayer.dataset.feedUrl = "";
+    audioPlayer.dataset.feedTitle = "";
+    audioPlayer.load();
     updateAudioPlayerStatusText();
+    updateAudioToggleControl(false, false);
     setCurrentAudioFeed(null);
     hideAudioPlayerShell();
 }
@@ -562,9 +597,15 @@ function handleGlobalAudioPause() {
         return;
     }
     updateAudioPlayerStatusText();
-    if (audioPlayer.currentTime === 0 || audioPlayer.ended) {
+    if (audioPlayer.ended || audioPlayer.currentTime === 0) {
         hideAudioPlayerShell();
         setCurrentAudioFeed(null);
+    } else {
+        const feedUrl = audioPlayer.dataset.feedUrl || null;
+        if (feedUrl) {
+            rememberAudioTitle(feedUrl, audioPlayer.dataset.feedTitle || getAudioTitle(feedUrl));
+            setCurrentAudioFeed(feedUrl);
+        }
     }
 }
 

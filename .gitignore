@@ -7,3 +7,4 @@ Untitled1.ipynb
 out.mp3
 static/podcasts/*
 !static/podcasts/.gitkeep
+__pycache__/audio_podcast_backend.cpython-312.pyc

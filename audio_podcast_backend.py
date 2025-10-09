@@ -6,14 +6,20 @@ import hashlib
 import io
 import json
 import logging
+import math
+import os
 import time
 import wave
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
-from google import genai
-from google.genai import types
+try:
+    from google import genai
+    from google.genai import types
+except ImportError:  # pragma: no cover - optional dependency for real generation
+    genai = None
+    types = None
 
 
 LOGGER = logging.getLogger("audio_podcast_backend")
@@ -29,6 +35,12 @@ DEFAULT_SPEAKERS = (
 DEFAULT_SAMPLE_RATE = 24000
 DEFAULT_SAMPLE_WIDTH = 2
 DEFAULT_CHANNELS = 1
+FAKE_AUDIO_SECONDS = 8
+FAKE_AUDIO_FREQUENCY = 440.0
+
+
+def _env_fake_audio_flag() -> bool:
+    return os.getenv("PODCAST_FAKE_AUDIO", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _ensure_directory(path: Path) -> Path:
@@ -72,6 +84,17 @@ def _wrap_pcm_as_wav(pcm: bytes, channels: int = DEFAULT_CHANNELS, sample_width:
         wav_file.setframerate(sample_rate)
         wav_file.writeframes(pcm)
     return buffer.getvalue()
+
+
+def _sine_wave_pcm(duration_seconds: int, sample_rate: int, frequency: float, amplitude: float = 0.32) -> bytes:
+    total_samples = int(duration_seconds * sample_rate)
+    max_amplitude = int((2 ** (DEFAULT_SAMPLE_WIDTH * 8 - 1)) - 1)
+    scaled_amplitude = max(0, min(1, amplitude)) * max_amplitude
+    frames = bytearray()
+    for index in range(total_samples):
+        sample = int(scaled_amplitude * math.sin(2 * math.pi * frequency * (index / sample_rate)))
+        frames.extend(sample.to_bytes(DEFAULT_SAMPLE_WIDTH, byteorder="little", signed=True))
+    return bytes(frames)
 
 
 def _normalise_audio_bytes(audio_bytes: bytes, mime_type: str) -> tuple[bytes, str]:
@@ -149,6 +172,7 @@ class AudioPodcastManager:
         transcript_model: str = TRANSCRIPT_MODEL,
         tts_model: str = TTS_MODEL,
         speakers: Iterable[tuple[str, str]] = DEFAULT_SPEAKERS,
+        use_fake_audio: Optional[bool] = None,
     ) -> None:
         self.output_dir = _ensure_directory(Path(output_dir))
         self.transcript_model = transcript_model
@@ -157,9 +181,19 @@ class AudioPodcastManager:
         self._jobs: Dict[str, AudioJob] = {}
         self._jobs_lock = asyncio.Lock()
         self._client: Optional[genai.Client] = None
+        self._explicit_fake_audio = use_fake_audio
+
+    def _using_fake_audio(self) -> bool:
+        if self._explicit_fake_audio is not None:
+            return bool(self._explicit_fake_audio)
+        return _env_fake_audio_flag()
 
     def _client_guard(self) -> genai.Client:
+        if self._using_fake_audio():
+            raise RuntimeError("Client guard should not be used when fake audio is enabled.")
         if self._client is None:
+            if genai is None:
+                raise RuntimeError("google-genai package not available; disable PODCAST_FAKE_AUDIO or install dependency.")
             self._client = genai.Client()
         return self._client
 
@@ -191,9 +225,20 @@ class AudioPodcastManager:
         job.status = "generating"
         job.updated_at = time.time()
         try:
-            transcript = await asyncio.to_thread(self._generate_transcript, job.channel_title, job.articles)
-            job.transcript = transcript
-            audio_bytes, mime_type = await asyncio.to_thread(self._synthesise_audio, transcript)
+            fake_audio_mode = self._using_fake_audio()
+            LOGGER.info(
+                "Starting %s audio generation for feed %s",
+                "fake" if fake_audio_mode else "Gemini",
+                job.feed_url,
+            )
+            if fake_audio_mode:
+                transcript = self._generate_dummy_transcript(job.channel_title, job.articles)
+                job.transcript = transcript
+                audio_bytes, mime_type = self._generate_dummy_audio(transcript)
+            else:
+                transcript = await asyncio.to_thread(self._generate_transcript, job.channel_title, job.articles)
+                job.transcript = transcript
+                audio_bytes, mime_type = await asyncio.to_thread(self._synthesise_audio, transcript)
             audio_bytes, mime_type = await asyncio.to_thread(_normalise_audio_bytes, audio_bytes, mime_type)
             audio_path = self._write_audio(job.feed_url, audio_bytes, mime_type)
             job.audio_path = audio_path
@@ -201,7 +246,12 @@ class AudioPodcastManager:
             job.audio_mime_type = mime_type
             job.status = "ready"
             job.updated_at = time.time()
-            LOGGER.info("Generated audio podcast for %s at %s", job.feed_url, job.audio_path)
+            LOGGER.info(
+                "Completed %s audio generation for %s (%s)",
+                "fake" if fake_audio_mode else "Gemini",
+                job.feed_url,
+                job.audio_mime_type,
+            )
         except asyncio.CancelledError:
             job.status = "cancelled"
             job.updated_at = time.time()
@@ -214,6 +264,9 @@ class AudioPodcastManager:
             LOGGER.exception("Audio generation failed for %s", job.feed_url)
 
     def _generate_transcript(self, channel_title: str, articles: List[Dict[str, str]]) -> str:
+        if genai is None or types is None:
+            raise RuntimeError("google-genai package is required for real transcript generation.")
+        LOGGER.info("Requesting Gemini transcript for feed '%s' with %d articles", channel_title, len(articles))
         prompt = (
             "Generate a conversational podcast dialogue between two news anchors named Liam and Anya. "
             "Liam is serious and concise, while Anya is witty and energetic. "
@@ -231,6 +284,9 @@ class AudioPodcastManager:
         return response.text.strip()
 
     def _synthesise_audio(self, transcript: str) -> tuple[bytes, str]:
+        if genai is None or types is None:
+            raise RuntimeError("google-genai package is required for real audio synthesis.")
+        LOGGER.info("Requesting Gemini TTS synthesis for transcript (%d chars)", len(transcript))
         client = self._client_guard()
         speaker_configs = []
         for speaker_name, voice_name in self.speakers:
@@ -255,6 +311,24 @@ class AudioPodcastManager:
             ),
         )
         return _extract_audio_bytes(response)
+
+    def _generate_dummy_transcript(self, channel_title: str, articles: List[Dict[str, str]]) -> str:
+        headlines = ", ".join(article.get("title") or "Untitled story" for article in articles[:MAX_PROMPT_ARTICLES])
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        return (
+            f"[FAKE PODCAST SCRIPT]\n"
+            f"Feed: {channel_title}\n"
+            f"Generated: {timestamp}\n"
+            f"Stories discussed: {headlines or 'No stories available'}\n"
+            "Hosts Liam and Anya share highlights in this simulated recording."
+        )
+
+    def _generate_dummy_audio(self, transcript: str) -> tuple[bytes, str]:
+        duration = max(2, int(FAKE_AUDIO_SECONDS))
+        LOGGER.info("Generating fake sine-wave audio for %d seconds", duration)
+        audio_bytes = _sine_wave_pcm(duration, DEFAULT_SAMPLE_RATE, FAKE_AUDIO_FREQUENCY)
+        header = _wrap_pcm_as_wav(audio_bytes)
+        return header, "audio/wav"
 
     def _write_audio(self, feed_url: str, audio_bytes: bytes, mime_type: str) -> Path:
         ext = self._extension_for_mime(mime_type)
@@ -303,7 +377,7 @@ class AudioPodcastManager:
             return [job.to_dict() for job in self._jobs.values()]
 
 
-audio_manager = AudioPodcastManager()
+audio_manager = AudioPodcastManager(use_fake_audio=True)
 
 
 async def ensure_audio_for_feed(feed_url: str, channel_title: str, articles: List[Dict[str, str]]) -> Dict[str, Optional[str]]:
