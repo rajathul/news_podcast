@@ -26,6 +26,10 @@ const historyPopup = document.getElementById("historyPopup");
 const historyList = document.getElementById("historyList");
 const historyCloseButton = document.getElementById("historyCloseButton");
 const historyClearButton = document.getElementById("historyClearButton");
+const floatingHeading = document.createElement("div");
+floatingHeading.id = "floatingHeading";
+floatingHeading.className = "floating-heading";
+floatingHeading.hidden = true;
 
 let sourceSequence = 0;
 let cardObserver = null;
@@ -86,6 +90,7 @@ async function loadArticles(showSkeleton = true) {
         lastRefreshed.textContent = "";
         updateSourcesList();
         detachPanelProgressListeners();
+        floatingHeading.hidden = true;
         return;
     }
 
@@ -152,6 +157,7 @@ async function loadArticles(showSkeleton = true) {
         panelsContainer.innerHTML = "";
         updateSourcesList();
         detachPanelProgressListeners();
+        floatingHeading.hidden = true;
     } finally {
         refreshButton.disabled = false;
     }
@@ -187,6 +193,7 @@ function render() {
         emptyState.hidden = true;
         statusHeadline.textContent = "Add a feed URL to load stories.";
         detachPanelProgressListeners();
+        floatingHeading.hidden = true;
         return;
     }
 
@@ -199,6 +206,7 @@ function render() {
         }
         panelsContainer.innerHTML = "";
         detachPanelProgressListeners();
+        floatingHeading.hidden = true;
 
         if (state.items.length === 0 && state.feedErrors.length) {
             statusHeadline.textContent = "All feeds are currently unavailable.";
@@ -369,8 +377,10 @@ function initializePanelProgressTracking() {
     panelProgressPanels = Array.from(panelsContainer.querySelectorAll(".panel"));
     if (!panelProgressPanels.length) {
         detachPanelProgressListeners();
+        floatingHeading.hidden = true;
         return;
     }
+    ensureFloatingHeadingMount();
     ensurePanelProgressListeners();
     requestPanelProgressUpdate();
 }
@@ -414,10 +424,13 @@ function requestPanelProgressUpdate() {
 
 function updatePanelProgressValues() {
     if (!panelProgressPanels.length) {
+        floatingHeading.hidden = true;
         return;
     }
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 1;
     const anchor = viewportHeight * 0.35;
+    let leadingPanel = null;
+    let leadingScore = -Infinity;
     panelProgressPanels.forEach(panel => {
         const header = panel.querySelector(".panel__header");
         const headerRect = header?.getBoundingClientRect();
@@ -426,16 +439,63 @@ function updatePanelProgressValues() {
         const offset = anchor - panelRect.top;
         const progress = clamp01(offset / (headerHeight * 1.4));
         const gridProgress = clamp01((progress - 0.25) / 0.75);
+        const title = header?.querySelector(".panel__title");
+        const naturalWidth = title ? measureNaturalWidth(title) : 0;
+        const availableWidth = Math.max(panel.clientWidth - 48, 120);
+        const lengthScale = naturalWidth > 0 ? clamp(availableWidth / naturalWidth, 0.55, 1.05) : 1;
+        const scaleBase = 1 + (1 - progress) * 0.45;
+        const finalScale = clamp(scaleBase * lengthScale, 0.55, 1.55);
         panel.style.setProperty("--panel-progress", progress.toFixed(3));
         panel.style.setProperty("--panel-grid-progress", gridProgress.toFixed(3));
+        panel.style.setProperty("--panel-title-scale", finalScale.toFixed(3));
         panel.classList.toggle("panel--grid-ready", gridProgress > 0.12);
+        const panelScore = gridProgress + progress * 0.5;
+        if (panelScore > leadingScore) {
+            leadingScore = panelScore;
+            leadingPanel = { panel, header, title };
+        }
     });
+    if (leadingPanel?.title) {
+        floatingHeading.hidden = false;
+        floatingHeading.textContent = leadingPanel.title.textContent ?? "";
+    } else {
+        floatingHeading.hidden = true;
+    }
 }
 
 function clamp01(value) {
     if (value < 0) return 0;
     if (value > 1) return 1;
     return value;
+}
+
+function clamp(value, min, max) {
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
+}
+
+function measureNaturalWidth(element) {
+    if (!element) {
+        return 0;
+    }
+    const recorded = Number(element.dataset.naturalWidth);
+    if (!Number.isNaN(recorded) && recorded > 0) {
+        return recorded;
+    }
+    const width = element.scrollWidth;
+    if (width > 0) {
+        element.dataset.naturalWidth = String(width);
+    }
+    return width;
+}
+
+function ensureFloatingHeadingMount() {
+    if (floatingHeading.isConnected) {
+        return;
+    }
+    const mountTarget = document.querySelector(".feed-panel") || document.body;
+    mountTarget.appendChild(floatingHeading);
 }
 
 function renderSkeletonPanels(panelCount = 1) {
