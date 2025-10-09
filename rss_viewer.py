@@ -14,7 +14,6 @@ from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 
 
-RSS_FEED_URL = "https://www.theguardian.com/international/rss"
 USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -134,8 +133,10 @@ async def home(request: Request) -> HTMLResponse:
 
 
 @app.get("/api/articles")
-async def get_articles(feed: Optional[str] = Query(default=None, description="Optional RSS feed URL to fetch.")) -> Dict[str, Any]:
-    feed_url = feed.strip() if feed else RSS_FEED_URL
+async def get_articles(feed: str = Query(..., description="RSS feed URL to fetch.")) -> Dict[str, Any]:
+    feed_url = feed.strip()
+    if not feed_url:
+        raise HTTPException(status_code=400, detail="Feed must be provided.")
     if not feed_url.lower().startswith(("http://", "https://")):
         raise HTTPException(status_code=400, detail="Feed must be a valid HTTP or HTTPS URL.")
 

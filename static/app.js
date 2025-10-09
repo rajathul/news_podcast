@@ -1,5 +1,4 @@
 const API_ENDPOINT = "/api/articles";
-const DEFAULT_RSS_URL = "https://www.theguardian.com/international/rss";
 
 const STORAGE_KEYS = {
     theme: "nfv-theme",
@@ -37,7 +36,7 @@ const state = {
     items: [],
     sort: "latest",
     query: "",
-    sources: [createSource({ feed: null, title: "The Guardian", url: DEFAULT_RSS_URL })],
+    sources: [],
     feedErrors: [],
     searchHistory: loadSearchHistory()
 };
@@ -57,6 +56,24 @@ function createSource({ feed, title, url }) {
 }
 
 async function loadArticles(showSkeleton = true) {
+    if (!state.sources.length) {
+        state.items = [];
+        state.feedErrors = [];
+        refreshButton.disabled = false;
+        if (panelObserver) {
+            panelObserver.disconnect();
+            panelObserver = null;
+        }
+        panelsContainer.innerHTML = "";
+        toggleError(false);
+        emptyState.hidden = true;
+        statusHeadline.textContent = "Add a feed URL to load stories.";
+        lastRefreshed.dateTime = "";
+        lastRefreshed.textContent = "";
+        updateSourcesList();
+        return;
+    }
+
     if (showSkeleton) {
         const skeletonPanels = Math.max(1, Math.min(3, state.sources.length));
         renderSkeletonPanels(skeletonPanels);
@@ -125,9 +142,10 @@ async function loadArticles(showSkeleton = true) {
 }
 
 async function fetchSourceArticles(source) {
-    const endpoint = source.feed
-        ? `${API_ENDPOINT}?feed=${encodeURIComponent(source.feed)}`
-        : API_ENDPOINT;
+    if (!source.feed) {
+        throw new Error("Feed URL is required for this source.");
+    }
+    const endpoint = `${API_ENDPOINT}?feed=${encodeURIComponent(source.feed)}`;
 
     const response = await fetch(endpoint);
     if (!response.ok) {
@@ -143,6 +161,18 @@ async function fetchSourceArticles(source) {
 }
 
 function render() {
+    if (!state.sources.length) {
+        if (panelObserver) {
+            panelObserver.disconnect();
+            panelObserver = null;
+        }
+        panelsContainer.innerHTML = "";
+        toggleError(false);
+        emptyState.hidden = true;
+        statusHeadline.textContent = "Add a feed URL to load stories.";
+        return;
+    }
+
     const filtered = filterAndSort(state.items);
 
     if (!filtered.length) {
@@ -513,6 +543,13 @@ function formatSourceLabel(source) {
 
 function updateSourcesList(counts = new Map()) {
     sourcesList.innerHTML = "";
+    if (!state.sources.length) {
+        const pill = document.createElement("span");
+        pill.className = "source-pill";
+        pill.textContent = "No feeds added yet";
+        sourcesList.appendChild(pill);
+        return;
+    }
     state.sources.forEach(source => {
         const pill = document.createElement("span");
         pill.className = "source-pill";
