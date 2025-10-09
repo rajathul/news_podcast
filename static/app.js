@@ -29,6 +29,9 @@ const historyClearButton = document.getElementById("historyClearButton");
 
 let sourceSequence = 0;
 let cardObserver = null;
+let panelProgressPanels = [];
+let panelProgressRaf = null;
+let panelProgressListenersAttached = false;
 
 const MAX_HISTORY = 15;
 const PANEL_GROUP_SIZE = 6;
@@ -82,6 +85,7 @@ async function loadArticles(showSkeleton = true) {
         lastRefreshed.dateTime = "";
         lastRefreshed.textContent = "";
         updateSourcesList();
+        detachPanelProgressListeners();
         return;
     }
 
@@ -147,6 +151,7 @@ async function loadArticles(showSkeleton = true) {
         statusHeadline.textContent = "Unable to fetch feeds right now.";
         panelsContainer.innerHTML = "";
         updateSourcesList();
+        detachPanelProgressListeners();
     } finally {
         refreshButton.disabled = false;
     }
@@ -181,6 +186,7 @@ function render() {
         toggleError(false);
         emptyState.hidden = true;
         statusHeadline.textContent = "Add a feed URL to load stories.";
+        detachPanelProgressListeners();
         return;
     }
 
@@ -192,6 +198,7 @@ function render() {
             cardObserver = null;
         }
         panelsContainer.innerHTML = "";
+        detachPanelProgressListeners();
 
         if (state.items.length === 0 && state.feedErrors.length) {
             statusHeadline.textContent = "All feeds are currently unavailable.";
@@ -222,6 +229,7 @@ function render() {
         panelsContainer.appendChild(panelElement);
     });
     setupCardObserver();
+    initializePanelProgressTracking();
 
     const descriptor = state.query ? "stories matching your search" : "stories";
     let message = `Showing ${filtered.length} ${descriptor}`;
@@ -275,15 +283,6 @@ function createPanel(articles, panelMeta = {}) {
         title.className = "panel__title";
         title.textContent = panelMeta.title;
         header.appendChild(title);
-        if (panelMeta.url) {
-            const link = document.createElement("a");
-            link.className = "panel__link";
-            link.href = panelMeta.url;
-            link.target = "_blank";
-            link.rel = "noopener noreferrer";
-            link.textContent = "Visit source";
-            header.appendChild(link);
-        }
         panel.appendChild(header);
     }
 
@@ -366,6 +365,79 @@ function setupCardObserver() {
     });
 }
 
+function initializePanelProgressTracking() {
+    panelProgressPanels = Array.from(panelsContainer.querySelectorAll(".panel"));
+    if (!panelProgressPanels.length) {
+        detachPanelProgressListeners();
+        return;
+    }
+    ensurePanelProgressListeners();
+    requestPanelProgressUpdate();
+}
+
+function ensurePanelProgressListeners() {
+    if (panelProgressListenersAttached) {
+        return;
+    }
+    panelProgressListenersAttached = true;
+    window.addEventListener("scroll", handlePanelProgressInvalidate, { passive: true });
+    window.addEventListener("resize", handlePanelProgressInvalidate, { passive: true });
+}
+
+function detachPanelProgressListeners() {
+    if (!panelProgressListenersAttached) {
+        return;
+    }
+    window.removeEventListener("scroll", handlePanelProgressInvalidate);
+    window.removeEventListener("resize", handlePanelProgressInvalidate);
+    panelProgressListenersAttached = false;
+    panelProgressPanels = [];
+    if (panelProgressRaf !== null) {
+        window.cancelAnimationFrame(panelProgressRaf);
+        panelProgressRaf = null;
+    }
+}
+
+function handlePanelProgressInvalidate() {
+    requestPanelProgressUpdate();
+}
+
+function requestPanelProgressUpdate() {
+    if (panelProgressRaf !== null) {
+        return;
+    }
+    panelProgressRaf = window.requestAnimationFrame(() => {
+        panelProgressRaf = null;
+        updatePanelProgressValues();
+    });
+}
+
+function updatePanelProgressValues() {
+    if (!panelProgressPanels.length) {
+        return;
+    }
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 1;
+    const anchor = viewportHeight * 0.35;
+    panelProgressPanels.forEach(panel => {
+        const header = panel.querySelector(".panel__header");
+        const headerRect = header?.getBoundingClientRect();
+        const panelRect = panel.getBoundingClientRect();
+        const headerHeight = headerRect ? Math.max(headerRect.height, 1) : Math.max(panelRect.height * 0.25, 1);
+        const offset = anchor - panelRect.top;
+        const progress = clamp01(offset / (headerHeight * 1.4));
+        const gridProgress = clamp01((progress - 0.25) / 0.75);
+        panel.style.setProperty("--panel-progress", progress.toFixed(3));
+        panel.style.setProperty("--panel-grid-progress", gridProgress.toFixed(3));
+        panel.classList.toggle("panel--grid-ready", gridProgress > 0.12);
+    });
+}
+
+function clamp01(value) {
+    if (value < 0) return 0;
+    if (value > 1) return 1;
+    return value;
+}
+
 function renderSkeletonPanels(panelCount = 1) {
     panelsContainer.innerHTML = "";
     for (let panelIndexValue = 0; panelIndexValue < panelCount; panelIndexValue += 1) {
@@ -404,6 +476,7 @@ function renderSkeletonPanels(panelCount = 1) {
         panel.appendChild(grid);
         panelsContainer.appendChild(panel);
     }
+    initializePanelProgressTracking();
 }
 
 function createArticleCard(article) {
