@@ -171,6 +171,19 @@
     </div>
 
     <audio id="panelAudioPlayer" preload="none" aria-hidden="true"></audio>
+    <div id="panelAudioPlayerShell" class="audio-player" hidden>
+        <div class="audio-player__header">
+            <span class="audio-player__badge">Now playing</span>
+            <button type="button" class="audio-player__close" id="audioCloseControl" aria-label="Close audio player">✕</button>
+        </div>
+        <div class="audio-player__title" id="panelAudioPlayerTitle">Podcast audio</div>
+        <div class="audio-player__status" id="panelAudioPlayerStatus">Ready • 00:00 / --:--</div>
+        <div class="audio-player__controls">
+            <button type="button" class="audio-player__button" id="audioPlayControl">Play</button>
+            <button type="button" class="audio-player__button" id="audioPauseControl">Pause</button>
+            <button type="button" class="audio-player__button" id="audioStopControl">Stop</button>
+        </div>
+    </div>
     <script type="module" src="{{ url_for('static', path='app.js') }}?v=20240601"></script>
 </body>
 </html>

@@ -29,6 +29,13 @@ const historyList = document.getElementById("historyList");
 const historyCloseButton = document.getElementById("historyCloseButton");
 const historyClearButton = document.getElementById("historyClearButton");
 const audioPlayer = document.getElementById("panelAudioPlayer");
+const audioPlayerShell = document.getElementById("panelAudioPlayerShell");
+const audioPlayerTitle = document.getElementById("panelAudioPlayerTitle");
+const audioPlayerStatus = document.getElementById("panelAudioPlayerStatus");
+const audioPlayControl = document.getElementById("audioPlayControl");
+const audioPauseControl = document.getElementById("audioPauseControl");
+const audioStopControl = document.getElementById("audioStopControl");
+const audioCloseControl = document.getElementById("audioCloseControl");
 const floatingHeading = document.createElement("div");
 floatingHeading.id = "floatingHeading";
 floatingHeading.className = "floating-heading";
@@ -72,13 +79,44 @@ const state = {
     sourceCounts: new Map(),
     audioStatuses: new Map(),
     audioPollers: new Map(),
-    currentAudioFeed: null
+    currentAudioFeed: null,
+    audioTitles: new Map()
 };
 
 if (audioPlayer) {
     audioPlayer.addEventListener("ended", handleGlobalAudioEnded);
     audioPlayer.addEventListener("pause", handleGlobalAudioPause);
     audioPlayer.addEventListener("play", handleGlobalAudioPlay);
+    audioPlayer.addEventListener("timeupdate", updateAudioPlayerStatusText);
+    audioPlayer.addEventListener("loadedmetadata", updateAudioPlayerStatusText);
+}
+
+if (audioPlayControl) {
+    audioPlayControl.addEventListener("click", () => {
+        if (!audioPlayer) return;
+        audioPlayer.play().catch(error => {
+            console.warn("Unable to resume playback:", error);
+        });
+    });
+}
+
+if (audioPauseControl) {
+    audioPauseControl.addEventListener("click", () => {
+        if (!audioPlayer) return;
+        audioPlayer.pause();
+    });
+}
+
+if (audioStopControl) {
+    audioStopControl.addEventListener("click", () => {
+        stopAudioPlayback();
+    });
+}
+
+if (audioCloseControl) {
+    audioCloseControl.addEventListener("click", () => {
+        stopAudioPlayback();
+    });
 }
 
 function createSourceId() {
@@ -140,19 +178,21 @@ async function loadArticles(showSkeleton = true) {
                 const { items, title, url, feed, audio } = result.value;
                 source.title = title;
                 source.url = url;
+                const feedKey = feed || url || source.feed;
+                rememberAudioTitle(feedKey, title);
                 if (audio) {
-                    upsertAudioStatus(feed || url, audio);
+                    upsertAudioStatus(feedKey, audio);
                 } else {
-                    requestAudioStatus(feed || url);
+                    requestAudioStatus(feedKey);
                 }
-                scheduleAudioPolling(feed || url);
+                scheduleAudioPolling(feedKey);
                 items.forEach(item => {
                     aggregated.push({
                         ...item,
                         sourceId: source.id,
                         sourceTitle: title,
                         sourceUrl: url,
-                        sourceFeed: feed || source.feed
+                        sourceFeed: feedKey
                     });
                     counts.set(source.id, (counts.get(source.id) ?? 0) + 1);
                 });
@@ -223,7 +263,22 @@ function upsertAudioStatus(feedUrl, rawStatus) {
         return;
     }
     state.audioStatuses.set(feedUrl, status);
-    refreshRenderedAudioButtons();
+    if (state.currentAudioFeed === feedUrl) {
+        refreshRenderedAudioButtons();
+        updateAudioPlayerStatusText();
+    } else {
+        refreshRenderedAudioButtons();
+    }
+}
+
+function rememberAudioTitle(feedUrl, title) {
+    if (!feedUrl || !title) {
+        return;
+    }
+    state.audioTitles.set(feedUrl, title);
+    if (state.currentAudioFeed === feedUrl && audioPlayerTitle) {
+        audioPlayerTitle.textContent = title;
+    }
 }
 
 function normaliseAudioStatus(feedUrl, rawStatus) {
@@ -240,6 +295,20 @@ function normaliseAudioStatus(feedUrl, rawStatus) {
         updated_at: rawStatus.updated_at || null
     };
     return status;
+}
+
+function getAudioTitle(feedUrl) {
+    if (!feedUrl) {
+        return "";
+    }
+    if (state.audioTitles.has(feedUrl)) {
+        return state.audioTitles.get(feedUrl);
+    }
+    const source = state.sources.find(entry => entry.feed === feedUrl || entry.url === feedUrl);
+    if (source && source.title) {
+        return source.title;
+    }
+    return deriveTitle("", feedUrl);
 }
 
 async function requestAudioStatus(feedUrl) {
@@ -314,6 +383,9 @@ function updateAudioButtonElement(button) {
         return;
     }
     const feedUrl = button.dataset.feedUrl;
+    if (feedUrl && !button.dataset.feedTitle) {
+        button.dataset.feedTitle = getAudioTitle(feedUrl);
+    }
     const status = feedUrl ? state.audioStatuses.get(feedUrl) : null;
     button.disabled = true;
     button.classList.remove("is-ready", "is-error", "is-playing");
@@ -354,6 +426,7 @@ async function handlePanelAudioClick(event) {
     if (!feedUrl) {
         return;
     }
+    const feedTitle = button?.dataset?.feedTitle || getAudioTitle(feedUrl);
     const status = state.audioStatuses.get(feedUrl);
     if (
         !status ||
@@ -378,21 +451,28 @@ async function handlePanelAudioClick(event) {
             audioPlayer.pause();
             return;
         }
-        playPanelAudio(feedUrl, status);
+        playPanelAudio(feedUrl, status, feedTitle);
         return;
     }
     requestAudioStatus(feedUrl);
 }
 
-function playPanelAudio(feedUrl, status) {
+function playPanelAudio(feedUrl, status, titleLabel) {
     if (!audioPlayer || !status.audio_url) {
         return;
+    }
+    if (feedUrl) {
+        rememberAudioTitle(feedUrl, titleLabel || getAudioTitle(feedUrl));
     }
     const audioSrc = resolveAudioSourceUrl(status);
     if (audioPlayer.src !== audioSrc) {
         audioPlayer.src = audioSrc;
     }
     audioPlayer.dataset.feedUrl = feedUrl;
+    if (titleLabel) {
+        audioPlayer.dataset.feedTitle = titleLabel;
+    }
+    openAudioPlayerShell(feedUrl, titleLabel);
     audioPlayer
         .play()
         .then(() => {
@@ -411,12 +491,79 @@ function resolveAudioSourceUrl(status) {
     return `${status.audio_url}${cacheBust}`;
 }
 
-function handleGlobalAudioEnded() {
+function openAudioPlayerShell(feedUrl, titleLabel) {
+    if (!audioPlayerShell) {
+        return;
+    }
+    if (feedUrl) {
+        audioPlayerShell.dataset.feedUrl = feedUrl;
+    }
+    if (titleLabel && audioPlayerTitle) {
+        audioPlayerTitle.textContent = titleLabel;
+    } else if (audioPlayerTitle && feedUrl) {
+        audioPlayerTitle.textContent = getAudioTitle(feedUrl);
+    }
+    audioPlayerShell.hidden = false;
+    updateAudioPlayerStatusText();
+}
+
+function hideAudioPlayerShell() {
+    if (!audioPlayerShell) {
+        return;
+    }
+    audioPlayerShell.hidden = true;
+    audioPlayerShell.dataset.feedUrl = "";
+}
+
+function updateAudioPlayerStatusText() {
+    if (!audioPlayerStatus || !audioPlayer) {
+        return;
+    }
+    const isPlaying = !audioPlayer.paused && !audioPlayer.ended;
+    const current = formatClockTime(audioPlayer.currentTime || 0);
+    const duration = Number.isFinite(audioPlayer.duration) && audioPlayer.duration > 0 ? formatClockTime(audioPlayer.duration) : "--:--";
+    const statusLabel = audioPlayer.ended
+        ? "Finished"
+        : isPlaying
+            ? "Playing"
+            : audioPlayer.currentTime > 0
+                ? "Paused"
+                : "Ready";
+    audioPlayerStatus.textContent = `${statusLabel} • ${current} / ${duration}`;
+}
+
+function formatClockTime(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0) {
+        return "00:00";
+    }
+    const totalSeconds = Math.floor(seconds);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+}
+
+function stopAudioPlayback() {
+    if (!audioPlayer) {
+        return;
+    }
+    audioPlayer.pause();
+    audioPlayer.currentTime = 0;
+    updateAudioPlayerStatusText();
     setCurrentAudioFeed(null);
+    hideAudioPlayerShell();
+}
+
+function handleGlobalAudioEnded() {
+    stopAudioPlayback();
 }
 
 function handleGlobalAudioPause() {
-    if (audioPlayer && !audioPlayer.seeking && audioPlayer.paused) {
+    if (!audioPlayer) {
+        return;
+    }
+    updateAudioPlayerStatusText();
+    if (audioPlayer.currentTime === 0 || audioPlayer.ended) {
+        hideAudioPlayerShell();
         setCurrentAudioFeed(null);
     }
 }
@@ -425,15 +572,27 @@ function handleGlobalAudioPlay() {
     if (!audioPlayer) {
         return;
     }
-    setCurrentAudioFeed(audioPlayer.dataset.feedUrl || null);
+    const feedUrl = audioPlayer.dataset.feedUrl || null;
+    const title = audioPlayer.dataset.feedTitle || getAudioTitle(feedUrl);
+    if (feedUrl) {
+        rememberAudioTitle(feedUrl, title);
+        openAudioPlayerShell(feedUrl, title);
+    }
+    setCurrentAudioFeed(feedUrl);
 }
 
 function setCurrentAudioFeed(feedUrl) {
     if (state.currentAudioFeed === feedUrl) {
         refreshRenderedAudioButtons();
+        updateAudioPlayerStatusText();
         return;
     }
     state.currentAudioFeed = feedUrl;
+    if (feedUrl) {
+        openAudioPlayerShell(feedUrl, getAudioTitle(feedUrl));
+    } else {
+        hideAudioPlayerShell();
+    }
     refreshRenderedAudioButtons();
 }
 
@@ -451,6 +610,7 @@ function render() {
         floatingHeading.hidden = true;
         clearAllAudioPolling();
         state.audioStatuses.clear();
+        state.audioTitles.clear();
         if (audioPlayer && !audioPlayer.paused) {
             audioPlayer.pause();
         }
@@ -458,6 +618,7 @@ function render() {
         refreshRenderedAudioButtons();
         return;
     }
+    state.audioTitles.clear();
 
     const filtered = filterAndSort(state.items);
     const filteredBySource = state.activeSourceId
@@ -570,7 +731,10 @@ function createPanel(articles, panelMeta = {}) {
     const panel = document.createElement("section");
     panel.className = "panel";
     panel.dataset.sourceId = panelMeta.key ?? "";
-    panel.dataset.feedUrl = panelMeta.feed ?? panelMeta.url ?? "";
+    const panelFeed = panelMeta.feed ?? panelMeta.url ?? "";
+    const panelTitle = panelMeta.title || deriveTitle("", panelFeed);
+    panel.dataset.feedUrl = panelFeed;
+    panel.dataset.feedTitle = panelTitle;
 
     const header = document.createElement("div");
     header.className = "panel__header";
@@ -582,13 +746,13 @@ function createPanel(articles, panelMeta = {}) {
     headerText.appendChild(eyebrow);
     const title = document.createElement("h3");
     title.className = "panel__title";
-    title.textContent = panelMeta.title || deriveTitle("", panelMeta.feed || panelMeta.url);
+    title.textContent = panelTitle;
     headerText.appendChild(title);
     header.appendChild(headerText);
 
     const headerActions = document.createElement("div");
     headerActions.className = "panel__header-actions";
-    const audioButton = createPanelAudioButton(panel.dataset.feedUrl);
+    const audioButton = createPanelAudioButton(panel.dataset.feedUrl, panelTitle);
     if (audioButton) {
         headerActions.appendChild(audioButton);
     }
@@ -610,7 +774,7 @@ function createPanel(articles, panelMeta = {}) {
     return panel;
 }
 
-function createPanelAudioButton(feedUrl) {
+function createPanelAudioButton(feedUrl, label) {
     if (!feedUrl) {
         return null;
     }
@@ -618,6 +782,9 @@ function createPanelAudioButton(feedUrl) {
     button.type = "button";
     button.className = "panel__audio-button";
     button.dataset.feedUrl = feedUrl;
+    if (label) {
+        button.dataset.feedTitle = label;
+    }
     button.addEventListener("click", handlePanelAudioClick);
     updateAudioButtonElement(button);
     return button;
