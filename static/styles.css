@@ -503,7 +503,7 @@ body[data-theme="light"] .source-pill.is-active {
     position: relative;
     min-height: 0;
     border-radius: calc(var(--radius-lg) + 10px);
-    border: 2px solid var(--border-strong);
+    border: 2px solid #000;
     background: linear-gradient(145deg, var(--bg-panel), var(--bg-elevated));
     padding: clamp(2rem, 5vw, 4rem);
     display: flex;
@@ -541,7 +541,8 @@ body[data-theme="light"] .source-pill.is-active {
     gap: 0.35rem;
     position: sticky;
     top: clamp(0.8rem, 4vh, 2rem);
-    z-index: 1;
+    z-index: 2;
+    pointer-events: auto;
     padding-bottom: 0.6rem;
     margin-bottom: 0.6rem;
     background: transparent;
@@ -564,7 +565,7 @@ body[data-theme="light"] .source-pill.is-active {
         color-mix(in srgb, var(--accent) 10%, transparent)
     );
     transform: translateY(calc(-6px * (1 - var(--panel-progress))));
-    opacity: calc(0.25 + 0.75 * var(--panel-progress));
+    opacity: clamp(0.2, 0.85 - var(--panel-progress), 0.9);
 }
 
 .panel__title {
@@ -599,12 +600,34 @@ body[data-theme="light"] .source-pill.is-active {
     background-clip: text;
     color: transparent;
     mix-blend-mode: screen;
+    position: relative;
+    isolation: isolate;
+    opacity: clamp(0.25, 1.05 - var(--panel-progress), 0.9);
+}
+
+.panel__title::after {
+    content: "";
+    position: absolute;
+    inset: 0 0 -0.15rem;
+    background: rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(6px);
+    mix-blend-mode: soft-light;
+    opacity: clamp(0, var(--panel-progress), 0.78);
+    pointer-events: none;
+    z-index: -1;
+    transition: opacity 180ms ease;
 }
 
 body[data-theme="light"] .panel__title {
     background-image: none;
     color: var(--text-primary);
     mix-blend-mode: normal;
+    opacity: clamp(0.3, 1 - (var(--panel-progress) * 0.6), 0.92);
+}
+
+body[data-theme="light"] .panel__title::after {
+    background: rgba(255, 255, 255, 0.28);
+    mix-blend-mode: multiply;
 }
 
 body[data-theme="light"] .panel__eyebrow {
