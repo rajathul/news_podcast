@@ -31,6 +31,7 @@ let sourceSequence = 0;
 let panelObserver = null;
 
 const MAX_HISTORY = 15;
+const PANEL_GROUP_SIZE = 2;
 
 const state = {
     items: [],
@@ -196,9 +197,9 @@ function render() {
     emptyState.hidden = true;
     panelsContainer.innerHTML = "";
 
-    const groups = chunkArticles(filtered, 4);
+    const groups = chunkArticles(filtered, PANEL_GROUP_SIZE);
     groups.forEach((group, index) => {
-        const panelElement = createPanel(group, index);
+        const panelElement = createPanel(group);
         if (index === 0) {
             panelElement.classList.add("is-active");
         }
@@ -252,53 +253,31 @@ function chunkArticles(items, size) {
     return chunks;
 }
 
-function createPanel(articles, index) {
+function createPanel(articles) {
     const panel = document.createElement("section");
     panel.className = "panel";
 
-    const header = document.createElement("div");
-    header.className = "panel__header";
-
-    const eyebrow = document.createElement("span");
-    eyebrow.className = "panel__eyebrow";
-    eyebrow.textContent = formatPanelEyebrow(articles, index);
-
-    const title = document.createElement("h3");
-    title.className = "panel__title";
-    title.textContent = formatPanelTitle(articles);
-
-    header.appendChild(eyebrow);
-    header.appendChild(title);
-    panel.appendChild(header);
-
     const grid = document.createElement("div");
     grid.className = "panel__grid";
-    articles.forEach(article => {
-        grid.appendChild(createArticleCard(article));
+    articles.forEach((article, position) => {
+        const card = createArticleCard(article);
+        applyCardHierarchy(card, position);
+        grid.appendChild(card);
     });
+    if (articles.length === 1) {
+        grid.classList.add("panel__grid--single");
+    }
     panel.appendChild(grid);
 
     return panel;
 }
 
-function formatPanelEyebrow(articles, index) {
-    const sources = [...new Set(articles.map(article => article.sourceTitle).filter(Boolean))];
-    if (!sources.length) {
-        return `Spotlight ${String(index + 1).padStart(2, "0")}`;
+function applyCardHierarchy(card, index) {
+    if (index === 0) {
+        card.classList.add("card--feature");
+    } else {
+        card.classList.add("card--spotlight");
     }
-    if (sources.length <= 2) {
-        return sources.join(" • ");
-    }
-    const [first, second] = sources;
-    return `${first} • ${second} +${sources.length - 2}`;
-}
-
-function formatPanelTitle(articles) {
-    if (!articles.length) {
-        return "Highlights";
-    }
-    const headline = articles[0].title || "Top story";
-    return truncate(headline, 80);
 }
 
 function setupPanelObserver() {
@@ -324,28 +303,13 @@ function renderSkeletonPanels(panelCount) {
     for (let index = 0; index < panelCount; index += 1) {
         const panel = document.createElement("section");
         panel.className = "panel panel--loading";
-
-        const header = document.createElement("div");
-        header.className = "panel__header";
-
-        const eyebrow = document.createElement("span");
-        eyebrow.className = "panel__eyebrow";
-        eyebrow.textContent = "Highlights incoming";
-
-        const title = document.createElement("h3");
-        title.className = "panel__title";
-        title.textContent = "Preparing the next stories";
-
-        header.appendChild(eyebrow);
-        header.appendChild(title);
-        panel.appendChild(header);
-
         const grid = document.createElement("div");
         grid.className = "panel__grid";
 
-        for (let cardIndex = 0; cardIndex < 4; cardIndex += 1) {
+        for (let cardIndex = 0; cardIndex < PANEL_GROUP_SIZE; cardIndex += 1) {
             const card = document.createElement("article");
             card.className = "card skeleton";
+            applyCardHierarchy(card, cardIndex);
 
             const media = document.createElement("div");
             media.className = "card__media skeleton__block";
