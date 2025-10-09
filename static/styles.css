@@ -491,6 +491,45 @@ a {
     opacity: 1;
 }
 
+.panel__header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.panel__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-sm);
+    border: 2px solid var(--border-strong);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    background: var(--bg-elevated);
+}
+
+.panel__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.45rem, 2.2vw, 1.9rem);
+    letter-spacing: -0.01em;
+}
+
+.panel__link {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.panel__link:hover {
+    text-decoration: underline;
+}
+
 .panel--loading {
     opacity: 0.7;
     transform: translateY(0);

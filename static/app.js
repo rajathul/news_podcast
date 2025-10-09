@@ -87,7 +87,7 @@ async function loadArticles(showSkeleton = true) {
 
     if (showSkeleton) {
         const skeletonPanels = Math.max(1, Math.min(3, state.sources.length));
-        renderSkeletonPanel(skeletonPanels * PANEL_GROUP_SIZE);
+        renderSkeletonPanels(skeletonPanels);
         statusHeadline.textContent = "Loading fresh headlines…";
     }
 
@@ -215,9 +215,12 @@ function render() {
     }
     panelsContainer.innerHTML = "";
 
-    const panelElement = createPanel(filtered);
-    panelElement.classList.add("is-active");
-    panelsContainer.appendChild(panelElement);
+    const groups = groupArticlesBySource(filtered);
+    groups.forEach(group => {
+        const panelElement = createPanel(group.articles, group);
+        panelElement.classList.add("is-active");
+        panelsContainer.appendChild(panelElement);
+    });
     setupCardObserver();
 
     const descriptor = state.query ? "stories matching your search" : "stories";
@@ -257,9 +260,32 @@ function filterAndSort(items) {
     return working;
 }
 
-function createPanel(articles) {
+function createPanel(articles, panelMeta = {}) {
     const panel = document.createElement("section");
     panel.className = "panel";
+    panel.dataset.sourceId = panelMeta.key ?? "";
+    if (panelMeta.title) {
+        const header = document.createElement("div");
+        header.className = "panel__header";
+        const eyebrow = document.createElement("span");
+        eyebrow.className = "panel__eyebrow";
+        eyebrow.textContent = "Feed focus";
+        header.appendChild(eyebrow);
+        const title = document.createElement("h3");
+        title.className = "panel__title";
+        title.textContent = panelMeta.title;
+        header.appendChild(title);
+        if (panelMeta.url) {
+            const link = document.createElement("a");
+            link.className = "panel__link";
+            link.href = panelMeta.url;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.textContent = "Visit source";
+            header.appendChild(link);
+        }
+        panel.appendChild(header);
+    }
 
     const grid = document.createElement("div");
     grid.className = "panel__grid";
@@ -288,6 +314,33 @@ function applyCardHierarchy(card, index) {
     card.style.setProperty("--card-order-index", index);
 }
 
+function groupArticlesBySource(items) {
+    const groups = [];
+    const index = new Map();
+    items.forEach(article => {
+        const fallbackKey =
+            article.sourceUrl ||
+            article.sourceTitle ||
+            article.link ||
+            `feed-${groups.length}`;
+        const key = article.sourceId || fallbackKey;
+        let group = index.get(key);
+        if (!group) {
+            const label = article.sourceTitle || deriveTitle("", article.sourceUrl);
+            group = {
+                key,
+                title: label,
+                url: article.sourceUrl,
+                articles: []
+            };
+            index.set(key, group);
+            groups.push(group);
+        }
+        group.articles.push(article);
+    });
+    return groups;
+}
+
 function setupCardObserver() {
     if (cardObserver) {
         cardObserver.disconnect();
@@ -313,35 +366,44 @@ function setupCardObserver() {
     });
 }
 
-function renderSkeletonPanel(cardCount = PANEL_GROUP_SIZE) {
+function renderSkeletonPanels(panelCount = 1) {
     panelsContainer.innerHTML = "";
-    const panel = document.createElement("section");
-    panel.className = "panel panel--loading is-active";
-    const grid = document.createElement("div");
-    grid.className = "panel__grid";
-
-    for (let cardIndex = 0; cardIndex < cardCount; cardIndex += 1) {
-        const card = document.createElement("article");
-        card.className = "card skeleton";
-        applyCardHierarchy(card, cardIndex);
-
-        const media = document.createElement("div");
-        media.className = "card__media skeleton__block";
-        card.appendChild(media);
-
-        const body = document.createElement("div");
-        body.className = "card__body";
-        body.innerHTML = `
-            <div class="skeleton__line"></div>
-            <div class="skeleton__line short"></div>
-            <div class="skeleton__line tiny"></div>
+    for (let panelIndexValue = 0; panelIndexValue < panelCount; panelIndexValue += 1) {
+        const panel = document.createElement("section");
+        panel.className = "panel panel--loading is-active";
+        const header = document.createElement("div");
+        header.className = "panel__header";
+        header.innerHTML = `
+            <span class="panel__eyebrow">Feed focus</span>
+            <h3 class="panel__title">Loading feed</h3>
         `;
-        card.appendChild(body);
-        grid.appendChild(card);
-    }
+        panel.appendChild(header);
+        const grid = document.createElement("div");
+        grid.className = "panel__grid";
 
-    panel.appendChild(grid);
-    panelsContainer.appendChild(panel);
+        for (let cardIndex = 0; cardIndex < PANEL_GROUP_SIZE; cardIndex += 1) {
+            const card = document.createElement("article");
+            card.className = "card skeleton";
+            applyCardHierarchy(card, cardIndex);
+
+            const media = document.createElement("div");
+            media.className = "card__media skeleton__block";
+            card.appendChild(media);
+
+            const body = document.createElement("div");
+            body.className = "card__body";
+            body.innerHTML = `
+                <div class="skeleton__line"></div>
+                <div class="skeleton__line short"></div>
+                <div class="skeleton__line tiny"></div>
+            `;
+            card.appendChild(body);
+            grid.appendChild(card);
+        }
+
+        panel.appendChild(grid);
+        panelsContainer.appendChild(panel);
+    }
 }
 
 function createArticleCard(article) {
