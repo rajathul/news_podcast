@@ -2,3 +2,8 @@ Untitled.ipynb
 .ipynb_checkpoints/Untitled-checkpoint.ipynb
 podcast_news.mp3
 __pycache__/rss_viewer.cpython-312.pyc
+Untitled1.ipynb
+.ipynb_checkpoints/Untitled1-checkpoint.ipynb
+out.mp3
+static/podcasts/*
+!static/podcasts/.gitkeep

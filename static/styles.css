@@ -4,6 +4,7 @@
     --radius-lg: 20px;
     --radius-md: 14px;
     --radius-sm: 8px;
+    --radius-pill: 999px;
     --transition: 180ms ease;
     color-scheme: dark light;
 }
@@ -548,6 +549,19 @@ body[data-theme="light"] .source-pill.is-active {
     background: transparent;
 }
 
+.panel__header-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.panel__header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+}
+
 .panel__eyebrow {
     display: inline-flex;
     align-items: center;
@@ -633,6 +647,57 @@ body[data-theme="light"] .panel__title::after {
 body[data-theme="light"] .panel__eyebrow {
     color: var(--text-secondary);
     background: color-mix(in srgb, var(--bg-panel) 60%, transparent);
+}
+
+.panel__audio-button {
+    border-radius: var(--radius-pill);
+    border: 1.5px solid color-mix(in srgb, var(--border-strong) 70%, var(--accent) 30%);
+    padding: 0.3rem 0.85rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    background: color-mix(in srgb, var(--bg-panel) 85%, var(--accent) 15%);
+    color: var(--text-primary);
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    cursor: pointer;
+    transition:
+        background 160ms ease,
+        color 160ms ease,
+        border-color 160ms ease,
+        transform 160ms ease;
+}
+
+.panel__audio-button:is(:hover, :focus-visible) {
+    background: color-mix(in srgb, var(--accent) 65%, var(--bg-panel) 35%);
+    color: var(--bg-page);
+    transform: translateY(-1px);
+}
+
+.panel__audio-button:disabled {
+    cursor: wait;
+    opacity: 0.6;
+    background: color-mix(in srgb, var(--bg-panel) 96%, var(--accent) 4%);
+    color: var(--text-muted);
+    transform: none;
+}
+
+.panel__audio-button.is-ready {
+    border-color: var(--accent);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+
+.panel__audio-button.is-playing {
+    background: var(--accent);
+    color: var(--bg-page);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+}
+
+.panel__audio-button.is-error {
+    border-color: color-mix(in srgb, #ff7a7a 50%, var(--accent-strong) 50%);
+    color: color-mix(in srgb, var(--text-primary) 70%, #ff7a7a 30%);
 }
 
 .panel--loading {
@@ -924,6 +989,10 @@ body[data-theme="light"] .floating-heading {
 .card__link svg {
     width: 0.9rem;
     height: 0.9rem;
+}
+
+#panelAudioPlayer {
+    display: none;
 }
 
 .skeleton {

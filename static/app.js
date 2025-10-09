@@ -1,4 +1,6 @@
 const API_ENDPOINT = "/api/articles";
+const AUDIO_STATUS_ENDPOINT = "/api/audio/status";
+const AUDIO_POLL_INTERVAL = 5000;
 
 const STORAGE_KEYS = {
     theme: "nfv-theme",
@@ -26,6 +28,7 @@ const historyPopup = document.getElementById("historyPopup");
 const historyList = document.getElementById("historyList");
 const historyCloseButton = document.getElementById("historyCloseButton");
 const historyClearButton = document.getElementById("historyClearButton");
+const audioPlayer = document.getElementById("panelAudioPlayer");
 const floatingHeading = document.createElement("div");
 floatingHeading.id = "floatingHeading";
 floatingHeading.className = "floating-heading";
@@ -66,8 +69,17 @@ const state = {
     feedErrors: [],
     searchHistory: loadSearchHistory(),
     activeSourceId: null,
-    sourceCounts: new Map()
+    sourceCounts: new Map(),
+    audioStatuses: new Map(),
+    audioPollers: new Map(),
+    currentAudioFeed: null
 };
+
+if (audioPlayer) {
+    audioPlayer.addEventListener("ended", handleGlobalAudioEnded);
+    audioPlayer.addEventListener("pause", handleGlobalAudioPause);
+    audioPlayer.addEventListener("play", handleGlobalAudioPlay);
+}
 
 function createSourceId() {
     sourceSequence += 1;
@@ -125,15 +137,22 @@ async function loadArticles(showSkeleton = true) {
         results.forEach((result, index) => {
             const source = state.sources[index];
             if (result.status === "fulfilled") {
-                const { items, title, url } = result.value;
+                const { items, title, url, feed, audio } = result.value;
                 source.title = title;
                 source.url = url;
+                if (audio) {
+                    upsertAudioStatus(feed || url, audio);
+                } else {
+                    requestAudioStatus(feed || url);
+                }
+                scheduleAudioPolling(feed || url);
                 items.forEach(item => {
                     aggregated.push({
                         ...item,
                         sourceId: source.id,
                         sourceTitle: title,
-                        sourceUrl: url
+                        sourceUrl: url,
+                        sourceFeed: feed || source.feed
                     });
                     counts.set(source.id, (counts.get(source.id) ?? 0) + 1);
                 });
@@ -188,8 +207,234 @@ async function fetchSourceArticles(source) {
     const sourceUrl = payload.source || source.feed || source.url;
     const title = deriveTitle(payload.title, sourceUrl);
     const items = Array.isArray(payload.items) ? payload.items : [];
+    const audio = payload.audio && typeof payload.audio === "object" ? payload.audio : null;
+    if (audio && !audio.feed) {
+        audio.feed = source.feed;
+    }
+    return { items, title, url: sourceUrl, feed: source.feed, audio };
+}
 
-    return { items, title, url: sourceUrl };
+function upsertAudioStatus(feedUrl, rawStatus) {
+    if (!feedUrl) {
+        return;
+    }
+    const status = normaliseAudioStatus(feedUrl, rawStatus);
+    if (!status) {
+        return;
+    }
+    state.audioStatuses.set(feedUrl, status);
+    refreshRenderedAudioButtons();
+}
+
+function normaliseAudioStatus(feedUrl, rawStatus) {
+    if (!rawStatus || typeof rawStatus !== "object") {
+        return null;
+    }
+    const status = {
+        feed: rawStatus.feed || feedUrl,
+        status: rawStatus.status || "pending",
+        audio_url: rawStatus.audio_url || null,
+        mime_type: rawStatus.mime_type || null,
+        transcript: rawStatus.transcript || null,
+        error: rawStatus.error || null,
+        updated_at: rawStatus.updated_at || null
+    };
+    return status;
+}
+
+async function requestAudioStatus(feedUrl) {
+    if (!feedUrl) {
+        return;
+    }
+    try {
+        const response = await fetch(`${AUDIO_STATUS_ENDPOINT}?feed=${encodeURIComponent(feedUrl)}`);
+        if (!response.ok) {
+            throw new Error(`Status request failed with ${response.status}`);
+        }
+        const payload = await response.json();
+        upsertAudioStatus(feedUrl, payload);
+        scheduleAudioPolling(feedUrl);
+    } catch (error) {
+        console.warn("Unable to refresh audio status:", error);
+    }
+}
+
+function scheduleAudioPolling(feedUrl) {
+    if (!feedUrl) {
+        return;
+    }
+    const status = state.audioStatuses.get(feedUrl);
+    if (!shouldPollStatus(status)) {
+        clearAudioPoll(feedUrl);
+        return;
+    }
+    if (state.audioPollers.has(feedUrl)) {
+        return;
+    }
+    const timerId = window.setTimeout(() => {
+        state.audioPollers.delete(feedUrl);
+        requestAudioStatus(feedUrl);
+    }, AUDIO_POLL_INTERVAL);
+    state.audioPollers.set(feedUrl, timerId);
+}
+
+function clearAudioPoll(feedUrl) {
+    const timerId = state.audioPollers.get(feedUrl);
+    if (typeof timerId === "number") {
+        window.clearTimeout(timerId);
+    }
+    state.audioPollers.delete(feedUrl);
+}
+
+function clearAllAudioPolling() {
+    state.audioPollers.forEach(timerId => {
+        if (typeof timerId === "number") {
+            window.clearTimeout(timerId);
+        }
+    });
+    state.audioPollers.clear();
+}
+
+function shouldPollStatus(status) {
+    if (!status) {
+        return true;
+    }
+    return status.status === "pending" || status.status === "generating";
+}
+
+function refreshRenderedAudioButtons() {
+    const buttons = document.querySelectorAll(".panel__audio-button");
+    buttons.forEach(button => {
+        updateAudioButtonElement(button);
+    });
+}
+
+function updateAudioButtonElement(button) {
+    if (!button) {
+        return;
+    }
+    const feedUrl = button.dataset.feedUrl;
+    const status = feedUrl ? state.audioStatuses.get(feedUrl) : null;
+    button.disabled = true;
+    button.classList.remove("is-ready", "is-error", "is-playing");
+    if (!status) {
+        button.textContent = "Generating…";
+        scheduleAudioPolling(feedUrl);
+        return;
+    }
+    const labelStatus = status.status || "pending";
+    if (labelStatus === "ready" && status.audio_url) {
+        button.disabled = false;
+        button.classList.add("is-ready");
+        const isPlayingCurrent = state.currentAudioFeed === feedUrl && audioPlayer && !audioPlayer.paused;
+        if (isPlayingCurrent) {
+            button.classList.add("is-playing");
+            button.textContent = "Pause audio";
+        } else {
+            button.textContent = "Play audio";
+        }
+        return;
+    }
+    if (labelStatus === "error" || labelStatus === "cancelled") {
+        button.disabled = false;
+        button.classList.add("is-error");
+        button.textContent = "Retry audio";
+        return;
+    }
+    if (labelStatus === "generating" || labelStatus === "pending" || labelStatus === "queued" || labelStatus === "missing") {
+        button.textContent = "Generating…";
+        return;
+    }
+    button.textContent = "Check audio";
+}
+
+async function handlePanelAudioClick(event) {
+    const button = event.currentTarget;
+    const feedUrl = button?.dataset?.feedUrl;
+    if (!feedUrl) {
+        return;
+    }
+    const status = state.audioStatuses.get(feedUrl);
+    if (
+        !status ||
+        !status.status ||
+        status.status === "pending" ||
+        status.status === "generating" ||
+        status.status === "missing" ||
+        status.status === "queued"
+    ) {
+        button.disabled = true;
+        requestAudioStatus(feedUrl);
+        return;
+    }
+    if (status.status === "error") {
+        button.disabled = true;
+        await requestAudioStatus(feedUrl);
+        button.disabled = false;
+        return;
+    }
+    if (status.status === "ready" && status.audio_url) {
+        if (state.currentAudioFeed === feedUrl && audioPlayer && !audioPlayer.paused) {
+            audioPlayer.pause();
+            return;
+        }
+        playPanelAudio(feedUrl, status);
+        return;
+    }
+    requestAudioStatus(feedUrl);
+}
+
+function playPanelAudio(feedUrl, status) {
+    if (!audioPlayer || !status.audio_url) {
+        return;
+    }
+    const audioSrc = resolveAudioSourceUrl(status);
+    if (audioPlayer.src !== audioSrc) {
+        audioPlayer.src = audioSrc;
+    }
+    audioPlayer.dataset.feedUrl = feedUrl;
+    audioPlayer
+        .play()
+        .then(() => {
+            setCurrentAudioFeed(feedUrl);
+        })
+        .catch(error => {
+            console.warn("Unable to start audio playback:", error);
+        });
+}
+
+function resolveAudioSourceUrl(status) {
+    if (!status.audio_url) {
+        return "";
+    }
+    const cacheBust = status.updated_at ? `?v=${status.updated_at}` : "";
+    return `${status.audio_url}${cacheBust}`;
+}
+
+function handleGlobalAudioEnded() {
+    setCurrentAudioFeed(null);
+}
+
+function handleGlobalAudioPause() {
+    if (audioPlayer && !audioPlayer.seeking && audioPlayer.paused) {
+        setCurrentAudioFeed(null);
+    }
+}
+
+function handleGlobalAudioPlay() {
+    if (!audioPlayer) {
+        return;
+    }
+    setCurrentAudioFeed(audioPlayer.dataset.feedUrl || null);
+}
+
+function setCurrentAudioFeed(feedUrl) {
+    if (state.currentAudioFeed === feedUrl) {
+        refreshRenderedAudioButtons();
+        return;
+    }
+    state.currentAudioFeed = feedUrl;
+    refreshRenderedAudioButtons();
 }
 
 function render() {
@@ -204,6 +449,13 @@ function render() {
         statusHeadline.textContent = "Add a feed URL to load stories.";
         detachPanelProgressListeners();
         floatingHeading.hidden = true;
+        clearAllAudioPolling();
+        state.audioStatuses.clear();
+        if (audioPlayer && !audioPlayer.paused) {
+            audioPlayer.pause();
+        }
+        setCurrentAudioFeed(null);
+        refreshRenderedAudioButtons();
         return;
     }
 
@@ -224,6 +476,7 @@ function render() {
         if (state.items.length === 0 && state.feedErrors.length) {
             statusHeadline.textContent = "All feeds are currently unavailable.";
             emptyState.hidden = true;
+            refreshRenderedAudioButtons();
             return;
         }
 
@@ -232,6 +485,7 @@ function render() {
         statusHeadline.textContent = state.query
             ? `No matches for “${state.query}”`
             : "No stories available.";
+        refreshRenderedAudioButtons();
         return;
     }
 
@@ -247,6 +501,7 @@ function render() {
             formatSourceLabel(state.sources.find(source => source.id === state.activeSourceId) ?? {}) ||
             "selected source";
         statusHeadline.textContent = `No stories available for ${sourceLabel}.`;
+        refreshRenderedAudioButtons();
         return;
     }
 
@@ -266,6 +521,7 @@ function render() {
     });
     setupCardObserver();
     initializePanelProgressTracking();
+    refreshRenderedAudioButtons();
 
     const descriptor = state.query ? "stories matching your search" : "stories";
     const activeSourceLabel = state.activeSourceId
@@ -314,19 +570,30 @@ function createPanel(articles, panelMeta = {}) {
     const panel = document.createElement("section");
     panel.className = "panel";
     panel.dataset.sourceId = panelMeta.key ?? "";
-    if (panelMeta.title) {
-        const header = document.createElement("div");
-        header.className = "panel__header";
-        const eyebrow = document.createElement("span");
-        eyebrow.className = "panel__eyebrow";
-        eyebrow.textContent = "Feed focus";
-        header.appendChild(eyebrow);
-        const title = document.createElement("h3");
-        title.className = "panel__title";
-        title.textContent = panelMeta.title;
-        header.appendChild(title);
-        panel.appendChild(header);
+    panel.dataset.feedUrl = panelMeta.feed ?? panelMeta.url ?? "";
+
+    const header = document.createElement("div");
+    header.className = "panel__header";
+    const headerText = document.createElement("div");
+    headerText.className = "panel__header-text";
+    const eyebrow = document.createElement("span");
+    eyebrow.className = "panel__eyebrow";
+    eyebrow.textContent = "Feed focus";
+    headerText.appendChild(eyebrow);
+    const title = document.createElement("h3");
+    title.className = "panel__title";
+    title.textContent = panelMeta.title || deriveTitle("", panelMeta.feed || panelMeta.url);
+    headerText.appendChild(title);
+    header.appendChild(headerText);
+
+    const headerActions = document.createElement("div");
+    headerActions.className = "panel__header-actions";
+    const audioButton = createPanelAudioButton(panel.dataset.feedUrl);
+    if (audioButton) {
+        headerActions.appendChild(audioButton);
     }
+    header.appendChild(headerActions);
+    panel.appendChild(header);
 
     const grid = document.createElement("div");
     grid.className = "panel__grid";
@@ -341,6 +608,19 @@ function createPanel(articles, panelMeta = {}) {
     panel.appendChild(grid);
 
     return panel;
+}
+
+function createPanelAudioButton(feedUrl) {
+    if (!feedUrl) {
+        return null;
+    }
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "panel__audio-button";
+    button.dataset.feedUrl = feedUrl;
+    button.addEventListener("click", handlePanelAudioClick);
+    updateAudioButtonElement(button);
+    return button;
 }
 
 function applyCardHierarchy(card, index) {
@@ -372,6 +652,7 @@ function groupArticlesBySource(items) {
                 key,
                 title: label,
                 url: article.sourceUrl,
+                feed: article.sourceFeed || article.sourceUrl,
                 articles: []
             };
             index.set(key, group);

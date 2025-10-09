@@ -13,6 +13,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 
+from audio_podcast_backend import (
+    ensure_audio_for_feed,
+    get_all_audio_statuses,
+    get_audio_status,
+)
+
 
 USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -141,7 +147,15 @@ async def get_articles(feed: str = Query(..., description="RSS feed URL to fetch
         raise HTTPException(status_code=400, detail="Feed must be a valid HTTP or HTTPS URL.")
 
     title, items = await fetch_articles(feed_url)
-    return {"source": feed_url, "title": title, "items": items}
+    audio_job = await ensure_audio_for_feed(feed_url, title, items)
+    return {"source": feed_url, "title": title, "items": items, "audio": audio_job}
+
+
+@app.get("/api/audio/status")
+async def audio_status(feed: Optional[str] = Query(None)) -> Dict[str, Any]:
+    if feed:
+        return await get_audio_status(feed.strip())
+    return {"items": await get_all_audio_statuses()}
 
 
 @app.get("/healthz")
