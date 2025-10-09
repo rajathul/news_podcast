@@ -28,10 +28,20 @@ const historyCloseButton = document.getElementById("historyCloseButton");
 const historyClearButton = document.getElementById("historyClearButton");
 
 let sourceSequence = 0;
-let panelObserver = null;
+let cardObserver = null;
 
 const MAX_HISTORY = 15;
-const PANEL_GROUP_SIZE = 2;
+const PANEL_GROUP_SIZE = 6;
+const PANEL_ACTIVE_RATIO = 0.2;
+const BENTO_LAYOUT = [
+    { cols: 4, rows: 2, variant: "feature" },
+    { cols: 2, rows: 2, variant: "spotlight" },
+    { cols: 3, rows: 1, variant: "spotlight" },
+    { cols: 3, rows: 1, variant: "spotlight" },
+    { cols: 2, rows: 1, variant: "spotlight" },
+    { cols: 2, rows: 1, variant: "spotlight" }
+];
+const DEFAULT_BENTO_CELL = { cols: 2, rows: 1, variant: "spotlight" };
 
 const state = {
     items: [],
@@ -61,9 +71,9 @@ async function loadArticles(showSkeleton = true) {
         state.items = [];
         state.feedErrors = [];
         refreshButton.disabled = false;
-        if (panelObserver) {
-            panelObserver.disconnect();
-            panelObserver = null;
+        if (cardObserver) {
+            cardObserver.disconnect();
+            cardObserver = null;
         }
         panelsContainer.innerHTML = "";
         toggleError(false);
@@ -77,7 +87,7 @@ async function loadArticles(showSkeleton = true) {
 
     if (showSkeleton) {
         const skeletonPanels = Math.max(1, Math.min(3, state.sources.length));
-        renderSkeletonPanels(skeletonPanels);
+        renderSkeletonPanel(skeletonPanels * PANEL_GROUP_SIZE);
         statusHeadline.textContent = "Loading fresh headlines…";
     }
 
@@ -163,9 +173,9 @@ async function fetchSourceArticles(source) {
 
 function render() {
     if (!state.sources.length) {
-        if (panelObserver) {
-            panelObserver.disconnect();
-            panelObserver = null;
+        if (cardObserver) {
+            cardObserver.disconnect();
+            cardObserver = null;
         }
         panelsContainer.innerHTML = "";
         toggleError(false);
@@ -177,6 +187,10 @@ function render() {
     const filtered = filterAndSort(state.items);
 
     if (!filtered.length) {
+        if (cardObserver) {
+            cardObserver.disconnect();
+            cardObserver = null;
+        }
         panelsContainer.innerHTML = "";
 
         if (state.items.length === 0 && state.feedErrors.length) {
@@ -195,18 +209,16 @@ function render() {
 
     toggleError(false);
     emptyState.hidden = true;
+    if (cardObserver) {
+        cardObserver.disconnect();
+        cardObserver = null;
+    }
     panelsContainer.innerHTML = "";
 
-    const groups = chunkArticles(filtered, PANEL_GROUP_SIZE);
-    groups.forEach((group, index) => {
-        const panelElement = createPanel(group);
-        if (index === 0) {
-            panelElement.classList.add("is-active");
-        }
-        panelsContainer.appendChild(panelElement);
-    });
-
-    setupPanelObserver();
+    const panelElement = createPanel(filtered);
+    panelElement.classList.add("is-active");
+    panelsContainer.appendChild(panelElement);
+    setupCardObserver();
 
     const descriptor = state.query ? "stories matching your search" : "stories";
     let message = `Showing ${filtered.length} ${descriptor}`;
@@ -245,14 +257,6 @@ function filterAndSort(items) {
     return working;
 }
 
-function chunkArticles(items, size) {
-    const chunks = [];
-    for (let index = 0; index < items.length; index += size) {
-        chunks.push(items.slice(index, index + size));
-    }
-    return chunks;
-}
-
 function createPanel(articles) {
     const panel = document.createElement("section");
     panel.className = "panel";
@@ -273,62 +277,71 @@ function createPanel(articles) {
 }
 
 function applyCardHierarchy(card, index) {
-    if (index === 0) {
+    const layout = BENTO_LAYOUT[index % BENTO_LAYOUT.length] ?? DEFAULT_BENTO_CELL;
+    if (layout.variant === "feature") {
         card.classList.add("card--feature");
     } else {
         card.classList.add("card--spotlight");
     }
+    card.style.setProperty("--card-col-span", layout.cols);
+    card.style.setProperty("--card-row-span", layout.rows);
+    card.style.setProperty("--card-order-index", index);
 }
 
-function setupPanelObserver() {
-    if (panelObserver) {
-        panelObserver.disconnect();
+function setupCardObserver() {
+    if (cardObserver) {
+        cardObserver.disconnect();
     }
-    panelObserver = new IntersectionObserver(
+    cardObserver = new IntersectionObserver(
         entries => {
             entries.forEach(entry => {
-                entry.target.classList.toggle("is-active", entry.isIntersecting);
+                const isVisible = entry.intersectionRatio >= PANEL_ACTIVE_RATIO || entry.isIntersecting;
+                if (isVisible) {
+                    entry.target.classList.add("is-visible");
+                    cardObserver.unobserve(entry.target);
+                }
             });
         },
-        { threshold: 0.6, rootMargin: "-10% 0px -10% 0px" }
+        {
+            threshold: [0, PANEL_ACTIVE_RATIO, 0.65, 1],
+            rootMargin: "0px 0px -10% 0px"
+        }
     );
 
-    panelsContainer.querySelectorAll(".panel").forEach(panel => {
-        panelObserver.observe(panel);
+    panelsContainer.querySelectorAll(".card").forEach(card => {
+        cardObserver.observe(card);
     });
 }
 
-function renderSkeletonPanels(panelCount) {
+function renderSkeletonPanel(cardCount = PANEL_GROUP_SIZE) {
     panelsContainer.innerHTML = "";
-    for (let index = 0; index < panelCount; index += 1) {
-        const panel = document.createElement("section");
-        panel.className = "panel panel--loading";
-        const grid = document.createElement("div");
-        grid.className = "panel__grid";
+    const panel = document.createElement("section");
+    panel.className = "panel panel--loading is-active";
+    const grid = document.createElement("div");
+    grid.className = "panel__grid";
 
-        for (let cardIndex = 0; cardIndex < PANEL_GROUP_SIZE; cardIndex += 1) {
-            const card = document.createElement("article");
-            card.className = "card skeleton";
-            applyCardHierarchy(card, cardIndex);
+    for (let cardIndex = 0; cardIndex < cardCount; cardIndex += 1) {
+        const card = document.createElement("article");
+        card.className = "card skeleton";
+        applyCardHierarchy(card, cardIndex);
 
-            const media = document.createElement("div");
-            media.className = "card__media skeleton__block";
-            card.appendChild(media);
+        const media = document.createElement("div");
+        media.className = "card__media skeleton__block";
+        card.appendChild(media);
 
-            const body = document.createElement("div");
-            body.className = "card__body";
-            body.innerHTML = `
-                <div class="skeleton__line"></div>
-                <div class="skeleton__line short"></div>
-                <div class="skeleton__line tiny"></div>
-            `;
-            card.appendChild(body);
-            grid.appendChild(card);
-        }
-
-        panel.appendChild(grid);
-        panelsContainer.appendChild(panel);
+        const body = document.createElement("div");
+        body.className = "card__body";
+        body.innerHTML = `
+            <div class="skeleton__line"></div>
+            <div class="skeleton__line short"></div>
+            <div class="skeleton__line tiny"></div>
+        `;
+        card.appendChild(body);
+        grid.appendChild(card);
     }
+
+    panel.appendChild(grid);
+    panelsContainer.appendChild(panel);
 }
 
 function createArticleCard(article) {

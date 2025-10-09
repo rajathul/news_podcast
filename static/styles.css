@@ -450,18 +450,14 @@ a {
 }
 
 .panels {
-    display: flex;
-    flex-direction: column;
-    gap: clamp(32vh, 38vh, 48vh);
+    display: block;
     position: relative;
     padding-top: 0;
-    padding-bottom: 20vh;
 }
 
 .panel {
-    min-height: 100vh;
-    position: sticky;
-    top: 0;
+    position: relative;
+    min-height: 0;
     border-radius: calc(var(--radius-lg) + 10px);
     border: 2px solid var(--border-strong);
     background: linear-gradient(145deg, var(--bg-panel), var(--bg-elevated));
@@ -469,19 +465,10 @@ a {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    justify-content: flex-start;
-    z-index: 0;
-    width: 100%;
+    margin-bottom: 2.5rem;
     box-shadow:
     24px 24px 60px rgba(0, 0, 0, 0.32),
     -18px -18px 55px rgba(255, 255, 255, 0.06);
-    transition:
-        transform 520ms cubic-bezier(0.16, 1, 0.3, 1),
-        opacity 520ms cubic-bezier(0.16, 1, 0.3, 1),
-        border-color 280ms ease,
-        box-shadow 320ms ease;
-    opacity: 0.35;
-    transform: translateY(80px) scale(0.96);
     overflow: hidden;
 }
 
@@ -496,11 +483,8 @@ a {
 }
 
 .panel.is-active {
-    transform: translateY(0) scale(1);
-    opacity: 1;
     border-color: var(--accent);
     box-shadow: 0 60px 180px rgba(0, 0, 0, 0.26);
-    z-index: 2;
 }
 
 .panel.is-active::after {
@@ -515,6 +499,7 @@ a {
 .panel--loading .card {
     opacity: 1 !important;
     transform: none !important;
+    clip-path: inset(0 round var(--radius-md)) !important;
 }
 
 .panel__grid {
@@ -522,6 +507,7 @@ a {
     gap: 1.5rem;
     grid-template-columns: 1fr;
     grid-auto-rows: minmax(220px, auto);
+    grid-auto-flow: row;
     align-content: stretch;
     align-items: stretch;
     flex: 1 1 auto;
@@ -530,6 +516,8 @@ a {
 
 .panel__grid .card {
     height: 100%;
+    grid-column: auto;
+    grid-row: auto;
 }
 
 .panel__grid--single {
@@ -548,26 +536,41 @@ a {
     transition:
         transform 420ms cubic-bezier(0.19, 1, 0.22, 1),
         opacity 420ms ease,
-        border-color 200ms ease;
+        border-color 200ms ease,
+        clip-path 520ms cubic-bezier(0.19, 1, 0.22, 1);
     height: 100%;
+    clip-path: inset(0 round var(--radius-md));
 }
 
-.panel .card:not(.skeleton) {
+.panel .card {
+    transition-delay: calc(var(--card-order-index, 0) * 50ms);
+}
+
+.card:not(.skeleton) {
     opacity: 0;
-    transform: translateY(40px) scale(0.97);
+    transform: translateY(40px) scale(0.95);
+    border-radius: calc(var(--radius-lg) + 8px);
+    clip-path: inset(6% round calc(var(--radius-lg) + 8px));
 }
 
-.panel.is-active .card:not(.skeleton) {
+.card.is-visible:not(.skeleton) {
     opacity: 1;
     transform: translateY(0) scale(1);
+    border-radius: var(--radius-md);
+    clip-path: inset(0 round var(--radius-md));
+    animation: cardMorphIn 520ms cubic-bezier(0.19, 1, 0.22, 1) forwards;
 }
 
-.panel.is-active .card:not(.skeleton):nth-child(1) {
-    transition-delay: 0ms;
-}
-
-.panel.is-active .card:not(.skeleton):nth-child(2) {
-    transition-delay: 90ms;
+@keyframes cardMorphIn {
+    0% {
+        clip-path: inset(12% round calc(var(--radius-lg) + 12px));
+    }
+    60% {
+        clip-path: inset(0% round calc(var(--radius-lg) + 4px));
+    }
+    100% {
+        clip-path: inset(0 round var(--radius-md));
+    }
 }
 
 .card:hover {
@@ -593,32 +596,41 @@ a {
 
 @media (min-width: 640px) {
     .panel__grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        grid-auto-rows: minmax(240px, auto);
-    }
-
-    .panel__grid .card--feature {
-        grid-row: span 2;
-    }
-
-    .panel__grid .card--spotlight {
-        grid-row: span 2;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        grid-auto-rows: minmax(190px, auto);
+        grid-auto-flow: dense;
     }
 
     .panel__grid--single {
-        grid-template-columns: 1fr;
-        grid-auto-rows: minmax(280px, auto);
+        grid-template-columns: minmax(0, 1fr);
+        grid-auto-rows: minmax(300px, auto);
+    }
+
+    .panel__grid--single .card {
+        grid-column: auto;
+        grid-row: auto;
     }
 }
 
-@media (min-width: 1100px) {
+@media (min-width: 960px) {
     .panel__grid {
-        grid-template-columns: 3fr 2fr;
-        grid-auto-rows: minmax(260px, auto);
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-auto-rows: minmax(200px, auto);
+    }
+
+    .panel__grid .card {
+        grid-column: span var(--card-col-span, 2);
+        grid-row: span var(--card-row-span, 1);
     }
 
     .panel__grid--single {
-        grid-template-columns: 3fr;
+        grid-template-columns: minmax(0, 1fr);
+        grid-auto-rows: minmax(320px, auto);
+    }
+
+    .panel__grid--single .card {
+        grid-column: auto;
+        grid-row: auto;
     }
 }
 
