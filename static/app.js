@@ -31,6 +31,14 @@ floatingHeading.id = "floatingHeading";
 floatingHeading.className = "floating-heading";
 floatingHeading.hidden = true;
 
+sourcesList.addEventListener("click", handleSourceFilterInteraction);
+sourcesList.addEventListener("keydown", event => {
+    if (event.key !== "Enter" && event.key !== " ") {
+        return;
+    }
+    handleSourceFilterInteraction(event);
+});
+
 let sourceSequence = 0;
 let cardObserver = null;
 let panelProgressPanels = [];
@@ -39,7 +47,7 @@ let panelProgressListenersAttached = false;
 
 const MAX_HISTORY = 15;
 const PANEL_GROUP_SIZE = 6;
-const PANEL_ACTIVE_RATIO = 0.2;
+const PANEL_ACTIVE_RATIO = 0.12;
 const BENTO_LAYOUT = [
     { cols: 4, rows: 2, variant: "feature" },
     { cols: 2, rows: 2, variant: "spotlight" },
@@ -56,7 +64,9 @@ const state = {
     query: "",
     sources: [],
     feedErrors: [],
-    searchHistory: loadSearchHistory()
+    searchHistory: loadSearchHistory(),
+    activeSourceId: null,
+    sourceCounts: new Map()
 };
 
 function createSourceId() {
@@ -198,6 +208,9 @@ function render() {
     }
 
     const filtered = filterAndSort(state.items);
+    const filteredBySource = state.activeSourceId
+        ? filtered.filter(article => article.sourceId === state.activeSourceId)
+        : filtered;
 
     if (!filtered.length) {
         if (cardObserver) {
@@ -222,6 +235,21 @@ function render() {
         return;
     }
 
+    if (!filteredBySource.length) {
+        if (cardObserver) {
+            cardObserver.disconnect();
+            cardObserver = null;
+        }
+        panelsContainer.innerHTML = "";
+        toggleError(false);
+        emptyState.hidden = false;
+        const sourceLabel =
+            formatSourceLabel(state.sources.find(source => source.id === state.activeSourceId) ?? {}) ||
+            "selected source";
+        statusHeadline.textContent = `No stories available for ${sourceLabel}.`;
+        return;
+    }
+
     toggleError(false);
     emptyState.hidden = true;
     if (cardObserver) {
@@ -230,7 +258,7 @@ function render() {
     }
     panelsContainer.innerHTML = "";
 
-    const groups = groupArticlesBySource(filtered);
+    const groups = groupArticlesBySource(filteredBySource);
     groups.forEach(group => {
         const panelElement = createPanel(group.articles, group);
         panelElement.classList.add("is-active");
@@ -240,8 +268,14 @@ function render() {
     initializePanelProgressTracking();
 
     const descriptor = state.query ? "stories matching your search" : "stories";
-    let message = `Showing ${filtered.length} ${descriptor}`;
-    if (state.sources.length > 1) {
+    const activeSourceLabel = state.activeSourceId
+        ? formatSourceLabel(state.sources.find(source => source.id === state.activeSourceId) ?? {})
+        : null;
+    let message = `Showing ${filteredBySource.length} ${descriptor}`;
+    if (activeSourceLabel) {
+        message += ` from ${activeSourceLabel}`;
+    }
+    if (state.sources.length > 1 && !state.activeSourceId) {
         message += ` across ${state.sources.length} feeds`;
     }
     if (state.feedErrors.length) {
@@ -363,8 +397,8 @@ function setupCardObserver() {
             });
         },
         {
-            threshold: [0, PANEL_ACTIVE_RATIO, 0.65, 1],
-            rootMargin: "0px 0px -10% 0px"
+            threshold: [0, PANEL_ACTIVE_RATIO, 0.45, 0.85],
+            rootMargin: "0px 0px -6% 0px"
         }
     );
 
@@ -443,12 +477,12 @@ function updatePanelProgressValues() {
         const naturalWidth = title ? measureNaturalWidth(title) : 0;
         const availableWidth = Math.max(panel.clientWidth - 48, 120);
         const lengthScale = naturalWidth > 0 ? clamp(availableWidth / naturalWidth, 0.55, 1.05) : 1;
-        const scaleBase = 1 + (1 - progress) * 0.45;
-        const finalScale = clamp(scaleBase * lengthScale, 0.55, 1.55);
+        const scaleBase = 1 + (1 - progress) * 0.32;
+        const finalScale = clamp(scaleBase * lengthScale, 0.6, 1.42);
         panel.style.setProperty("--panel-progress", progress.toFixed(3));
         panel.style.setProperty("--panel-grid-progress", gridProgress.toFixed(3));
         panel.style.setProperty("--panel-title-scale", finalScale.toFixed(3));
-        panel.classList.toggle("panel--grid-ready", gridProgress > 0.12);
+        panel.classList.toggle("panel--grid-ready", gridProgress > 0.08);
         const panelScore = gridProgress + progress * 0.5;
         if (panelScore > leadingScore) {
             leadingScore = panelScore;
@@ -713,7 +747,11 @@ function formatSourceLabel(source) {
     return source.title || deriveTitle("", source.feed || source.url);
 }
 
-function updateSourcesList(counts = new Map()) {
+function updateSourcesList(counts = state.sourceCounts) {
+    if (!(counts instanceof Map)) {
+        counts = new Map(counts ? Array.from(counts) : []);
+    }
+    state.sourceCounts = counts;
     sourcesList.innerHTML = "";
     if (!state.sources.length) {
         const pill = document.createElement("span");
@@ -728,17 +766,67 @@ function updateSourcesList(counts = new Map()) {
         const label = formatSourceLabel(source);
         const count = counts.get(source.id);
         pill.textContent = typeof count === "number" ? `${label} (${count})` : label;
+        pill.dataset.sourceId = source.id;
+        pill.setAttribute("role", "button");
+        pill.setAttribute("tabindex", "0");
+        const isActive = state.activeSourceId === source.id;
+        pill.classList.toggle("is-active", isActive);
+        pill.setAttribute("aria-pressed", String(isActive));
         sourcesList.appendChild(pill);
     });
 }
 
-function toggleAddFeedForm(show) {
-    addFeedForm.hidden = !show;
-    addFeedButton.hidden = show;
-    if (show) {
-        feedInput.value = "";
-        feedInput.focus();
+function handleSourceFilterInteraction(event) {
+    if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") {
+        return;
     }
+    const pill = event.target.closest(".source-pill[data-source-id]");
+    if (!pill) {
+        return;
+    }
+    event.preventDefault();
+    const selectedId = pill.dataset.sourceId;
+    const nextActive = state.activeSourceId === selectedId ? null : selectedId;
+    if (state.activeSourceId === nextActive) {
+        return;
+    }
+    state.activeSourceId = nextActive;
+    updateSourcesList(state.sourceCounts);
+    render();
+}
+
+function toggleAddFeedForm(show) {
+    if (show) {
+        addFeedForm.hidden = false;
+        addFeedForm.classList.remove("is-visible", "is-closing");
+        // allow layout to settle before animating in
+        requestAnimationFrame(() => {
+            addFeedForm.classList.add("is-visible");
+        });
+        addFeedButton.hidden = true;
+        feedInput.value = "";
+        requestAnimationFrame(() => {
+            feedInput.focus();
+        });
+        return;
+    }
+
+    if (addFeedForm.hidden) {
+        addFeedButton.hidden = false;
+        return;
+    }
+
+    addFeedForm.classList.remove("is-visible");
+    addFeedForm.classList.add("is-closing");
+    const handleTransitionEnd = event => {
+        if (event.target !== addFeedForm) {
+            return;
+        }
+        addFeedForm.hidden = true;
+        addFeedForm.classList.remove("is-closing");
+    };
+    addFeedForm.addEventListener("transitionend", handleTransitionEnd, { once: true });
+    addFeedButton.hidden = false;
 }
 
 function addSource(feedUrl) {

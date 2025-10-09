@@ -254,6 +254,7 @@ a {
     font-size: 0.95rem;
     cursor: pointer;
     transition: background var(--transition), color var(--transition);
+    color: var(--text-secondary);
 }
 
 .pill-toggle__option.is-active {
@@ -281,6 +282,7 @@ a {
     border: 2px solid var(--border-strong);
     background: var(--bg-elevated);
     font-weight: 600;
+    color: var(--text-primary);
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -304,6 +306,19 @@ a {
     border-radius: var(--radius-md);
     border: 2px solid var(--border-strong);
     background: var(--bg-elevated);
+    opacity: 0;
+    transform: translateY(-10px) scale(0.96);
+    pointer-events: none;
+    transition:
+        opacity 200ms cubic-bezier(0.3, 0.8, 0.3, 1),
+        transform 220ms cubic-bezier(0.3, 0.8, 0.3, 1);
+    will-change: transform, opacity;
+}
+
+.add-feed__form.is-visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
 }
 
 .add-feed__form input {
@@ -336,6 +351,7 @@ a {
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    color: var(--text-primary);
 }
 
 .add-feed__submit {
@@ -415,6 +431,32 @@ a {
     font-size: 0.72rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+    cursor: pointer;
+    transition:
+        color var(--transition),
+        background var(--transition),
+        transform var(--transition);
+}
+
+.source-pill:hover {
+    transform: translateY(-1px);
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.source-pill.is-active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #111;
+}
+
+body[data-theme="light"] .source-pill {
+    color: var(--text-secondary);
+    background: color-mix(in srgb, var(--bg-panel) 85%, transparent);
+}
+
+body[data-theme="light"] .source-pill.is-active {
+    color: #ffffff;
 }
 
 .meta__timestamp {
@@ -532,12 +574,12 @@ a {
     letter-spacing: -0.01em;
     line-height: 1.05;
     transform-origin: top left;
-    transform: scale(var(--panel-title-scale, calc(1 + (1 - var(--panel-progress)) * 1.4))) translateZ(0);
+    transform: scale(var(--panel-title-scale, calc(1 + (1 - var(--panel-progress)) * 1.2))) translateZ(0);
     transition:
-        transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
-        letter-spacing 320ms ease,
-        max-height 260ms ease;
-    letter-spacing: calc(-0.018em - (1 - var(--panel-progress)) * 0.05em);
+        transform 220ms cubic-bezier(0.24, 0.9, 0.22, 1),
+        letter-spacing 200ms ease,
+        max-height 200ms ease;
+    letter-spacing: calc(-0.016em - (1 - var(--panel-progress)) * 0.04em);
     max-height: clamp(4rem, calc(3.4rem + 7vh), 10.6rem);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -557,6 +599,17 @@ a {
     background-clip: text;
     color: transparent;
     mix-blend-mode: screen;
+}
+
+body[data-theme="light"] .panel__title {
+    background-image: none;
+    color: var(--text-primary);
+    mix-blend-mode: normal;
+}
+
+body[data-theme="light"] .panel__eyebrow {
+    color: var(--text-secondary);
+    background: color-mix(in srgb, var(--bg-panel) 60%, transparent);
 }
 
 .panel--loading {
@@ -581,10 +634,10 @@ a {
     flex: 1 1 auto;
     min-height: 0;
     opacity: var(--panel-grid-progress);
-    transform: translateY(calc(52px * (1 - var(--panel-grid-progress))));
+    transform: translateY(calc(36px * (1 - var(--panel-grid-progress))));
     transition:
-        opacity 360ms ease,
-        transform 400ms cubic-bezier(0.19, 1, 0.22, 1);
+        opacity 220ms ease,
+        transform 260ms cubic-bezier(0.2, 0.9, 0.2, 1);
     pointer-events: none;
 }
 
@@ -608,16 +661,16 @@ a {
     overflow: hidden;
     will-change: transform, opacity;
     transition:
-        transform 420ms cubic-bezier(0.19, 1, 0.22, 1),
-        opacity 420ms ease,
-        border-color 200ms ease,
-        clip-path 520ms cubic-bezier(0.19, 1, 0.22, 1);
+        transform 240ms cubic-bezier(0.2, 0.9, 0.2, 1),
+        opacity 240ms ease,
+        border-color 160ms ease,
+        clip-path 260ms cubic-bezier(0.2, 0.9, 0.2, 1);
     height: 100%;
     clip-path: inset(0 round var(--radius-md));
 }
 
 .panel .card {
-    transition-delay: calc(var(--card-order-index, 0) * 50ms);
+    transition-delay: calc(var(--card-order-index, 0) * 35ms);
 }
 
 .panel.panel--grid-ready .panel__grid,
@@ -640,15 +693,21 @@ a {
     text-transform: uppercase;
     pointer-events: none;
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateY(-6px);
     transition:
-        opacity 200ms ease,
-        transform 220ms ease;
+        opacity 160ms ease,
+        transform 180ms ease;
 }
 
 .floating-heading:not([hidden]) {
     opacity: 0.92;
     transform: translateY(0);
+}
+
+body[data-theme="light"] .floating-heading {
+    background: color-mix(in srgb, var(--bg-body) 85%, transparent);
+    color: var(--text-primary);
+    mix-blend-mode: normal;
 }
 
 .card:not(.skeleton) {
