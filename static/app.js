@@ -42,10 +42,18 @@ const audioProgressDuration = document.getElementById("audioProgressDuration");
 const audioToggleControl = document.getElementById("audioToggleControl");
 const audioStopControl = document.getElementById("audioStopControl");
 const audioCloseControl = document.getElementById("audioCloseControl");
+const audioVisualizerShell = document.getElementById("audioVisualizerShell");
 const floatingHeading = document.createElement("div");
 floatingHeading.id = "floatingHeading";
 floatingHeading.className = "floating-heading";
 floatingHeading.hidden = true;
+
+if (audioVisualizerShell) {
+    audioVisualizerShell.style.setProperty("--audio-visualizer-ratio", "0");
+}
+if (audioPlayerShell) {
+    audioPlayerShell.style.setProperty("--audio-visualizer-ratio", "0");
+}
 
 sourcesList.addEventListener("click", handleSourceFilterInteraction);
 sourcesList.addEventListener("keydown", event => {
@@ -653,6 +661,7 @@ function updateAudioProgressUI(currentOverride, durationOverride) {
         audioProgress.max = resolvedDuration;
         const ratio = resolvedDuration ? Math.max(0, Math.min(1, Number(audioProgress.value) / resolvedDuration)) : 0;
         audioProgress.style.setProperty("--progress-ratio", ratio.toFixed(5));
+        setAudioVisualizerRatio(ratio, true);
         if (audioProgressCurrent) {
             audioProgressCurrent.textContent = formatClockTime(clampedCurrent);
         }
@@ -666,6 +675,7 @@ function updateAudioProgressUI(currentOverride, durationOverride) {
             audioProgress.value = 0;
         }
         audioProgress.style.setProperty("--progress-ratio", "0");
+        setAudioVisualizerRatio(0, false);
         if (audioProgressCurrent) {
             audioProgressCurrent.textContent = "00:00";
         }
@@ -673,6 +683,22 @@ function updateAudioProgressUI(currentOverride, durationOverride) {
             audioProgressDuration.textContent = "--:--";
         }
     }
+}
+
+function setAudioVisualizerRatio(ratio, hasDuration = true) {
+    if (!audioVisualizerShell && !audioPlayerShell) {
+        return;
+    }
+    const isPlaying = Boolean(audioPlayer && !audioPlayer.paused && !audioPlayer.ended);
+    let nextRatio = Number.isFinite(ratio) ? ratio : 0;
+    nextRatio = Math.max(0, Math.min(nextRatio, 1));
+    if (isPlaying) {
+        const minimum = hasDuration ? 0.08 : 0.12;
+        nextRatio = Math.max(nextRatio, minimum);
+    }
+    const ratioString = nextRatio.toFixed(5);
+    audioVisualizerShell?.style.setProperty("--audio-visualizer-ratio", ratioString);
+    audioPlayerShell?.style.setProperty("--audio-visualizer-ratio", ratioString);
 }
 
 function handleAudioToggleControl() {
@@ -730,6 +756,7 @@ function hideAudioPlayerShell() {
     audioPlayerShell.dataset.feedUrl = "";
     audioPlayerShell.classList.remove("audio-player--active", "audio-player--playing");
     body?.classList.remove("has-active-audio-player");
+    setAudioVisualizerRatio(0, false);
     syncAudioPlayerVisualState();
 }
 
