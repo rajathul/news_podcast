@@ -181,19 +181,22 @@
         </div>
         <div class="audio-player__title" id="panelAudioPlayerTitle">Podcast audio</div>
         <div class="audio-player__status" id="panelAudioPlayerStatus">Ready • 00:00 / --:--</div>
-        <div class="audio-player__visualizer" id="audioPlayerVisualizer" aria-hidden="true">
-            <span class="audio-player__bar" style="--bar-index: 0; --bar-peak: 0.5;"></span>
-            <span class="audio-player__bar" style="--bar-index: 1; --bar-peak: 0.9;"></span>
-            <span class="audio-player__bar" style="--bar-index: 2; --bar-peak: 0.7;"></span>
-            <span class="audio-player__bar" style="--bar-index: 3; --bar-peak: 1;"></span>
-            <span class="audio-player__bar" style="--bar-index: 4; --bar-peak: 0.85;"></span>
-            <span class="audio-player__bar" style="--bar-index: 5; --bar-peak: 0.6;"></span>
-            <span class="audio-player__bar" style="--bar-index: 6; --bar-peak: 0.65;"></span>
-            <span class="audio-player__bar" style="--bar-index: 7; --bar-peak: 0.95;"></span>
-            <span class="audio-player__bar" style="--bar-index: 8; --bar-peak: 0.75;"></span>
-            <span class="audio-player__bar" style="--bar-index: 9; --bar-peak: 0.6;"></span>
-            <span class="audio-player__bar" style="--bar-index: 10; --bar-peak: 0.9;"></span>
-            <span class="audio-player__bar" style="--bar-index: 11; --bar-peak: 0.55;"></span>
+        <div class="audio-player__progress">
+            <label class="visually-hidden" for="audioProgressControl">Seek podcast audio</label>
+            <input
+                type="range"
+                class="audio-player__progress-bar"
+                id="audioProgressControl"
+                value="0"
+                min="0"
+                max="1"
+                step="any"
+                disabled
+            >
+            <div class="audio-player__progress-times" aria-hidden="true">
+                <span id="audioProgressCurrent">00:00</span>
+                <span id="audioProgressDuration">--:--</span>
+            </div>
         </div>
         <div class="audio-player__controls">
             <button type="button" class="audio-player__button audio-player__button--primary" id="audioToggleControl">Play</button>

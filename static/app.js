@@ -30,9 +30,15 @@ const historyCloseButton = document.getElementById("historyCloseButton");
 const historyClearButton = document.getElementById("historyClearButton");
 const audioPlayer = document.getElementById("panelAudioPlayer");
 const audioPlayerShell = document.getElementById("panelAudioPlayerShell");
+
+if (audioPlayerShell) {
+    audioPlayerShell.dataset.state = "idle";
+}
 const audioPlayerTitle = document.getElementById("panelAudioPlayerTitle");
 const audioPlayerStatus = document.getElementById("panelAudioPlayerStatus");
-const audioPlayerVisualizer = document.getElementById("audioPlayerVisualizer");
+const audioProgress = document.getElementById("audioProgressControl");
+const audioProgressCurrent = document.getElementById("audioProgressCurrent");
+const audioProgressDuration = document.getElementById("audioProgressDuration");
 const audioToggleControl = document.getElementById("audioToggleControl");
 const audioStopControl = document.getElementById("audioStopControl");
 const audioCloseControl = document.getElementById("audioCloseControl");
@@ -54,6 +60,8 @@ let cardObserver = null;
 let panelProgressPanels = [];
 let panelProgressRaf = null;
 let panelProgressListenersAttached = false;
+let isAudioScrubbing = false;
+let audioProgressAnimationId = null;
 
 const MAX_HISTORY = 15;
 const PANEL_GROUP_SIZE = 6;
@@ -105,6 +113,43 @@ if (audioCloseControl) {
     audioCloseControl.addEventListener("click", () => {
         stopAudioPlayback();
     });
+}
+
+if (audioProgress) {
+    audioProgress.style.setProperty("--progress-ratio", "0");
+    const endScrub = event => {
+        if (!isAudioScrubbing) {
+            return;
+        }
+        isAudioScrubbing = false;
+        if (event && event.type.startsWith("pointer") && event.pointerId !== undefined && audioProgress.releasePointerCapture) {
+            try {
+                audioProgress.releasePointerCapture(event.pointerId);
+            } catch {
+                /* ignore pointer capture errors */
+            }
+        }
+        updateAudioProgressUI();
+    };
+    audioProgress.addEventListener("pointerdown", event => {
+        isAudioScrubbing = true;
+        if (event.pointerId !== undefined && audioProgress.setPointerCapture) {
+            try {
+                audioProgress.setPointerCapture(event.pointerId);
+            } catch {
+                /* ignore pointer capture errors */
+            }
+        }
+    });
+    audioProgress.addEventListener("pointerup", endScrub);
+    audioProgress.addEventListener("pointercancel", endScrub);
+    audioProgress.addEventListener("blur", endScrub);
+    audioProgress.addEventListener("keydown", () => {
+        isAudioScrubbing = true;
+    });
+    audioProgress.addEventListener("keyup", endScrub);
+    audioProgress.addEventListener("change", endScrub);
+    audioProgress.addEventListener("input", handleAudioProgressInput);
 }
 
 syncAudioPlayerVisualState();
@@ -500,6 +545,7 @@ function playPanelAudio(feedUrl, status, titleLabel) {
         .then(() => {
             setCurrentAudioFeed(feedUrl);
             updateAudioPlayerStatusText();
+            startAudioProgressAnimation();
         })
         .catch(error => {
             console.warn("Unable to start audio playback:", error);
@@ -537,9 +583,95 @@ function syncAudioPlayerVisualState() {
     audioPlayerShell.classList.toggle("audio-player--active", shouldAnimate);
     audioPlayerShell.classList.toggle("audio-player--playing", isVisible && isPlaying);
 
-    if (audioPlayerVisualizer) {
-        const visualState = isPlaying ? "playing" : hasSource ? "ready" : "idle";
-        audioPlayerVisualizer.dataset.state = visualState;
+    const visualState = isPlaying ? "playing" : hasSource ? "ready" : "idle";
+    audioPlayerShell.dataset.state = visualState;
+}
+
+function startAudioProgressAnimation() {
+    if (audioProgressAnimationId || !audioPlayer || !audioProgress || audioPlayer.paused || audioPlayer.ended) {
+        updateAudioProgressUI();
+        return;
+    }
+    const tick = () => {
+        if (!audioPlayer || audioPlayer.paused || audioPlayer.ended) {
+            audioProgressAnimationId = null;
+            updateAudioProgressUI();
+            return;
+        }
+        if (!isAudioScrubbing) {
+            updateAudioProgressUI();
+        }
+        audioProgressAnimationId = requestAnimationFrame(tick);
+    };
+    audioProgressAnimationId = requestAnimationFrame(tick);
+}
+
+function stopAudioProgressAnimation() {
+    if (audioProgressAnimationId) {
+        cancelAnimationFrame(audioProgressAnimationId);
+        audioProgressAnimationId = null;
+    }
+    updateAudioProgressUI();
+}
+
+function handleAudioProgressInput(event) {
+    if (!audioPlayer || !audioProgress) {
+        return;
+    }
+    const duration = audioPlayer.duration;
+    if (!Number.isFinite(duration) || duration <= 0) {
+        return;
+    }
+    const rawValue = Number(event.target.value);
+    if (!Number.isFinite(rawValue)) {
+        return;
+    }
+    const clamped = Math.max(0, Math.min(rawValue, duration));
+    audioPlayer.currentTime = clamped;
+    updateAudioProgressUI(clamped, duration);
+    if (audioPlayer.paused) {
+        updateAudioPlayerStatusText();
+    }
+}
+
+function updateAudioProgressUI(currentOverride, durationOverride) {
+    if (!audioProgress) {
+        return;
+    }
+    const resolvedDuration = Number.isFinite(durationOverride) && durationOverride > 0 ? durationOverride : audioPlayer?.duration;
+    const hasDuration = Number.isFinite(resolvedDuration) && resolvedDuration > 0;
+    const fallbackCurrent = Number.isFinite(currentOverride) ? currentOverride : audioPlayer?.currentTime || 0;
+    const activeCurrent =
+        isAudioScrubbing && !Number.isFinite(currentOverride) ? Number(audioProgress.value) || fallbackCurrent : fallbackCurrent;
+
+    if (hasDuration) {
+        const clampedCurrent = Math.max(0, Math.min(activeCurrent, resolvedDuration));
+        if (!isAudioScrubbing || Number.isFinite(currentOverride)) {
+            audioProgress.value = clampedCurrent;
+        }
+        audioProgress.disabled = false;
+        audioProgress.max = resolvedDuration;
+        const ratio = resolvedDuration ? Math.max(0, Math.min(1, Number(audioProgress.value) / resolvedDuration)) : 0;
+        audioProgress.style.setProperty("--progress-ratio", ratio.toFixed(5));
+        if (audioProgressCurrent) {
+            audioProgressCurrent.textContent = formatClockTime(clampedCurrent);
+        }
+        if (audioProgressDuration) {
+            audioProgressDuration.textContent = formatClockTime(resolvedDuration);
+        }
+    } else {
+        audioProgress.disabled = true;
+        audioProgress.max = 1;
+        if (!isAudioScrubbing || Number.isFinite(currentOverride)) {
+            audioProgress.value = 0;
+        }
+        audioProgress.style.setProperty("--progress-ratio", "0");
+        if (audioProgressCurrent) {
+            audioProgressCurrent.textContent = "00:00";
+        }
+        if (audioProgressDuration) {
+            audioProgressDuration.textContent = "--:--";
+        }
     }
 }
 
@@ -605,16 +737,21 @@ function updateAudioPlayerStatusText() {
     if (!audioPlayerStatus || !audioPlayer) {
         return;
     }
+    const currentSeconds = audioPlayer.currentTime || 0;
+    const durationSeconds = audioPlayer.duration;
+    updateAudioProgressUI(currentSeconds, durationSeconds);
+
     const isPlaying = !audioPlayer.paused && !audioPlayer.ended;
-    const current = formatClockTime(audioPlayer.currentTime || 0);
-    const duration = Number.isFinite(audioPlayer.duration) && audioPlayer.duration > 0 ? formatClockTime(audioPlayer.duration) : "--:--";
+    const current = formatClockTime(currentSeconds);
+    const duration =
+        Number.isFinite(durationSeconds) && durationSeconds > 0 ? formatClockTime(durationSeconds) : "--:--";
     const statusLabel = audioPlayer.ended
         ? "Finished"
         : isPlaying
             ? "Playing"
-            : audioPlayer.currentTime > 0
+            : currentSeconds > 0
                 ? "Paused"
-            : "Ready";
+                : "Ready";
     audioPlayerStatus.textContent = `${statusLabel} • ${current} / ${duration}`;
     updateAudioToggleControl(isPlaying, Boolean(audioPlayer.currentSrc));
 }
@@ -633,6 +770,8 @@ function stopAudioPlayback() {
     if (!audioPlayer) {
         return;
     }
+    isAudioScrubbing = false;
+    stopAudioProgressAnimation();
     audioPlayer.pause();
     audioPlayer.currentTime = 0;
     audioPlayer.removeAttribute("src");
@@ -654,6 +793,7 @@ function handleGlobalAudioPause() {
     if (!audioPlayer) {
         return;
     }
+    stopAudioProgressAnimation();
     updateAudioPlayerStatusText();
     if (audioPlayer.ended || audioPlayer.currentTime === 0) {
         hideAudioPlayerShell();
@@ -679,6 +819,7 @@ function handleGlobalAudioPlay() {
         openAudioPlayerShell(feedUrl, title);
     }
     setCurrentAudioFeed(feedUrl);
+    startAudioProgressAnimation();
     syncAudioPlayerVisualState();
 }
 
