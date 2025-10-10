@@ -42,17 +42,18 @@ const audioProgressDuration = document.getElementById("audioProgressDuration");
 const audioToggleControl = document.getElementById("audioToggleControl");
 const audioStopControl = document.getElementById("audioStopControl");
 const audioCloseControl = document.getElementById("audioCloseControl");
-const audioVisualizerShell = document.getElementById("audioVisualizerShell");
+const audioProgressVisualizer = document.getElementById("audioProgressVisualizer");
+const audioProgressBars = audioProgressVisualizer
+    ? Array.from(audioProgressVisualizer.querySelectorAll(".audio-progress-visualizer__bar"))
+    : [];
 const floatingHeading = document.createElement("div");
 floatingHeading.id = "floatingHeading";
 floatingHeading.className = "floating-heading";
 floatingHeading.hidden = true;
 
-if (audioVisualizerShell) {
-    audioVisualizerShell.style.setProperty("--audio-visualizer-ratio", "0");
-}
-if (audioPlayerShell) {
-    audioPlayerShell.style.setProperty("--audio-visualizer-ratio", "0");
+audioProgressVisualizer?.style.setProperty("--audio-progress-visualizer-ratio", "0");
+if (audioProgressBars.length) {
+    updateAudioVisualizerBars(0, false);
 }
 
 sourcesList.addEventListener("click", handleSourceFilterInteraction);
@@ -686,7 +687,7 @@ function updateAudioProgressUI(currentOverride, durationOverride) {
 }
 
 function setAudioVisualizerRatio(ratio, hasDuration = true) {
-    if (!audioVisualizerShell && !audioPlayerShell) {
+    if (!audioProgressVisualizer) {
         return;
     }
     const isPlaying = Boolean(audioPlayer && !audioPlayer.paused && !audioPlayer.ended);
@@ -697,8 +698,32 @@ function setAudioVisualizerRatio(ratio, hasDuration = true) {
         nextRatio = Math.max(nextRatio, minimum);
     }
     const ratioString = nextRatio.toFixed(5);
-    audioVisualizerShell?.style.setProperty("--audio-visualizer-ratio", ratioString);
-    audioPlayerShell?.style.setProperty("--audio-visualizer-ratio", ratioString);
+    audioProgressVisualizer.style.setProperty("--audio-progress-visualizer-ratio", ratioString);
+    updateAudioVisualizerBars(nextRatio, isPlaying);
+}
+
+function updateAudioVisualizerBars(ratio, isPlaying) {
+    if (!audioProgressBars.length) {
+        return;
+    }
+    const normalizedRatio = Number.isFinite(ratio) ? Math.max(0, Math.min(ratio, 1)) : 0;
+    const totalBars = audioProgressBars.length;
+    let activeCount = Math.round(normalizedRatio * totalBars);
+
+    if (isPlaying) {
+        const minimumActive = Math.max(1, Math.ceil(totalBars * 0.2));
+        activeCount = Math.max(activeCount, minimumActive);
+    } else if (normalizedRatio > 0) {
+        activeCount = Math.max(activeCount, 1);
+    } else {
+        activeCount = 0;
+    }
+    activeCount = Math.min(totalBars, activeCount);
+
+    audioProgressBars.forEach((bar, index) => {
+        const shouldActivate = index < activeCount;
+        bar.classList.toggle("is-active", shouldActivate);
+    });
 }
 
 function handleAudioToggleControl() {

@@ -1286,10 +1286,9 @@ body[data-theme="light"] .floating-heading {
     .audio-player,
     .audio-player::before,
     .audio-player::after,
-    .audio-player__visualizer-shell,
-    .audio-player__visualizer-shell::after,
-    .audio-player__visualizer,
-    .audio-equalizer__bar {
+    .audio-progress-visualizer,
+    .audio-progress-visualizer__fill,
+    .audio-progress-visualizer__bar {
         transition: none !important;
         animation: none !important;
     }
@@ -1310,7 +1309,6 @@ body[data-theme="light"] .floating-heading {
     backdrop-filter: blur(26px);
     overflow: hidden;
     isolation: isolate;
-    --audio-visualizer-ratio: 0;
     --audio-surface-stop-1: color-mix(in srgb, var(--bg-elevated) 60%, var(--accent) 40%);
     --audio-surface-stop-2: color-mix(in srgb, var(--bg-panel) 62%, var(--bg-body) 38%);
     --audio-surface-stop-3: color-mix(in srgb, #1a2436 65%, var(--accent) 35%);
@@ -1439,155 +1437,143 @@ body[data-theme="light"] .floating-heading {
     color: var(--text-secondary);
 }
 
-.audio-player__visualizer-shell {
-    position: relative;
-    display: block;
-    width: 100%;
-    height: clamp(1.3rem, 2vw, 1.8rem);
-    padding: 0.4rem 0.9rem;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--bg-panel) 82%, rgba(255, 255, 255, 0.12));
-    border: 1px solid color-mix(in srgb, var(--border-subtle) 65%, transparent);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
-    opacity: 0;
-    transform: translateY(-0.35rem);
-    transition:
-        opacity 200ms ease,
-        transform 220ms ease,
-        background 200ms ease,
-        border-color 200ms ease;
-    pointer-events: none;
-    overflow: hidden;
-    --audio-visualizer-mask-color: color-mix(in srgb, var(--bg-panel) 90%, rgba(7, 12, 20, 0.85));
-}
-
-.audio-player__visualizer-shell::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    right: 0;
-    left: calc(var(--audio-visualizer-ratio, 0) * 100%);
-    background: var(--audio-visualizer-mask-color);
-    transition:
-        left 200ms ease,
-        background 200ms ease;
-    pointer-events: none;
-    z-index: 1;
-}
-
-.audio-player[data-state="ready"] .audio-player__visualizer-shell {
-    opacity: 0.55;
-    transform: translateY(-0.15rem);
-}
-
-.audio-player--playing .audio-player__visualizer-shell {
-    opacity: 1;
-    transform: translateY(0);
-    background: color-mix(in srgb, var(--accent) 22%, rgba(9, 18, 34, 0.75));
-    border-color: color-mix(in srgb, var(--accent) 40%, rgba(148, 202, 255, 0.4));
-    --audio-visualizer-mask-color: color-mix(in srgb, rgba(7, 14, 28, 0.78), var(--accent) 35%);
-}
-
-.audio-player__visualizer {
-    position: relative;
-    display: flex;
-    align-items: flex-end;
-    gap: clamp(0.24rem, 0.75vw, 0.42rem);
-    height: 100%;
-    width: 100%;
-    z-index: 0;
-}
-
-.audio-equalizer__bar {
-    --bar-gradient-a: color-mix(in srgb, var(--accent) 85%, #ffffff 15%);
-    --bar-gradient-b: color-mix(in srgb, #9ad7ff 72%, var(--accent) 28%);
-    flex: 1 1 0;
-    min-width: clamp(0.28rem, 1vw, 0.52rem);
-    max-width: clamp(0.6rem, 1.8vw, 0.95rem);
-    height: 100%;
-    border-radius: 999px;
-    background: linear-gradient(180deg, var(--bar-gradient-a), var(--bar-gradient-b));
-    opacity: 0.85;
-    transform: scaleY(0.25);
-    transform-origin: 50% 100%;
-    animation: audioEqualizerPulse 1.6s ease-in-out infinite;
-    animation-play-state: paused;
-}
-
-.audio-player--playing .audio-equalizer__bar {
-    animation-play-state: running;
-}
-
-.audio-equalizer__bar:nth-child(2) {
-    animation-delay: 0.18s;
-    animation-duration: 1.3s;
-}
-
-.audio-equalizer__bar:nth-child(3) {
-    animation-delay: 0.32s;
-}
-
-.audio-equalizer__bar:nth-child(4) {
-    animation-delay: 0.44s;
-    animation-duration: 1.45s;
-}
-
-.audio-equalizer__bar:nth-child(5) {
-    animation-delay: 0.56s;
-}
-
-.audio-equalizer__bar:nth-child(6) {
-    animation-delay: 0.7s;
-    animation-duration: 1.35s;
-}
-
-.audio-equalizer__bar:nth-child(7) {
-    animation-delay: 0.84s;
-    animation-duration: 1.52s;
-}
-
-.audio-equalizer__bar:nth-child(8) {
-    animation-delay: 0.98s;
-    animation-duration: 1.38s;
-}
-
-.audio-equalizer__bar:nth-child(9) {
-    animation-delay: 1.12s;
-    animation-duration: 1.62s;
-}
-
-.audio-equalizer__bar:nth-child(10) {
-    animation-delay: 1.26s;
-    animation-duration: 1.34s;
-}
-
-.audio-equalizer__bar:nth-child(11) {
-    animation-delay: 1.4s;
-    animation-duration: 1.5s;
-}
-
-.audio-equalizer__bar:nth-child(12) {
-    animation-delay: 1.54s;
-    animation-duration: 1.4s;
-}
-
-.audio-player--active .audio-equalizer__bar {
-    opacity: 1;
-}
-
-.audio-player[data-state="idle"] .audio-equalizer__bar {
-    transform: scaleY(0.2);
-}
-
-.audio-player[data-state="ready"] .audio-equalizer__bar {
-    transform: scaleY(0.45);
-}
-
 .audio-player__progress {
     display: flex;
     flex-direction: column;
     gap: 0.45rem;
+}
+
+.audio-player__progress-track {
+    position: relative;
+    width: 100%;
+    height: 0.5rem;
+    border-radius: 999px;
+}
+
+.audio-progress-visualizer {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    border-radius: inherit;
+    pointer-events: none;
+    overflow: hidden;
+    background: transparent;
+    box-shadow: none;
+    transition: opacity 220ms ease;
+    --audio-progress-visualizer-ratio: 0;
+}
+
+.audio-progress-visualizer__fill {
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+    gap: clamp(0.12rem, 0.5vw, 0.28rem);
+    border-radius: inherit;
+    padding: 0;
+    overflow: hidden;
+    mix-blend-mode: normal;
+    transition: width 200ms ease-out, opacity 160ms ease-out;
+    opacity: 0;
+}
+
+.audio-progress-visualizer__bar {
+    --bar-gradient-a: color-mix(in srgb, var(--accent) 85%, #ffffff 15%);
+    --bar-gradient-b: color-mix(in srgb, #9ad7ff 72%, var(--accent) 28%);
+    flex: 1 1 0;
+    min-width: clamp(0.14rem, 0.6vw, 0.34rem);
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--bar-gradient-a), var(--bar-gradient-b));
+    opacity: 0.25;
+    transform: scaleY(0.18);
+    transform-origin: 50% 100%;
+    animation: audioEqualizerPulse 1.6s ease-in-out infinite;
+    animation-play-state: paused;
+    transition:
+        transform 200ms ease,
+        opacity 180ms ease;
+}
+
+.audio-progress-visualizer__bar.is-active {
+    opacity: 0.88;
+    transform: scaleY(0.6);
+    filter: drop-shadow(0 6px 16px rgba(78, 162, 255, 0.26));
+}
+
+.audio-player[data-state="ready"] .audio-progress-visualizer__fill,
+.audio-player[data-state="playing"] .audio-progress-visualizer__fill {
+    opacity: 1;
+}
+.audio-player--playing .audio-progress-visualizer__bar.is-active {
+    animation-play-state: running;
+}
+
+.audio-progress-visualizer__bar:nth-child(2) {
+    animation-delay: 0.18s;
+    animation-duration: 1.3s;
+}
+
+.audio-progress-visualizer__bar:nth-child(3) {
+    animation-delay: 0.32s;
+}
+
+.audio-progress-visualizer__bar:nth-child(4) {
+    animation-delay: 0.44s;
+    animation-duration: 1.45s;
+}
+
+.audio-progress-visualizer__bar:nth-child(5) {
+    animation-delay: 0.56s;
+}
+
+.audio-progress-visualizer__bar:nth-child(6) {
+    animation-delay: 0.7s;
+    animation-duration: 1.35s;
+}
+
+.audio-progress-visualizer__bar:nth-child(7) {
+    animation-delay: 0.84s;
+    animation-duration: 1.52s;
+}
+
+.audio-progress-visualizer__bar:nth-child(8) {
+    animation-delay: 0.98s;
+    animation-duration: 1.38s;
+}
+
+.audio-progress-visualizer__bar:nth-child(9) {
+    animation-delay: 1.12s;
+    animation-duration: 1.62s;
+}
+
+.audio-progress-visualizer__bar:nth-child(10) {
+    animation-delay: 1.26s;
+    animation-duration: 1.34s;
+}
+
+.audio-progress-visualizer__bar:nth-child(11) {
+    animation-delay: 1.4s;
+    animation-duration: 1.5s;
+}
+
+.audio-progress-visualizer__bar:nth-child(12) {
+    animation-delay: 1.54s;
+    animation-duration: 1.4s;
+}
+
+.audio-player[data-state="idle"] .audio-progress-visualizer__bar.is-active {
+    transform: scaleY(0.32);
+}
+
+.audio-player[data-state="ready"] .audio-progress-visualizer__bar.is-active {
+    transform: scaleY(0.52);
+}
+
+.audio-player[data-state="playing"] .audio-progress-visualizer__bar.is-active {
+    transform: scaleY(0.7);
 }
 
 .audio-player__progress-bar {
@@ -1595,25 +1581,17 @@ body[data-theme="light"] .floating-heading {
     width: 100%;
     height: 0.5rem;
     border-radius: 999px;
-    background-color: color-mix(in srgb, var(--bg-panel) 58%, rgba(255, 255, 255, 0.08));
-    background-image: linear-gradient(
-        90deg,
-        color-mix(in srgb, var(--accent) 82%, #9ad7ff 18%),
-        color-mix(in srgb, #9ad7ff 65%, var(--accent) 35%)
-    );
-    background-size: calc(var(--progress-ratio, 0) * 100%) 100%;
-    background-repeat: no-repeat;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    background: transparent;
+    box-shadow: none;
     appearance: none;
     -webkit-appearance: none;
     border: none;
     cursor: pointer;
     padding: 0;
-    will-change: background-size;
-    transition:
-        background-size 180ms ease-out,
-        box-shadow 160ms ease,
-        opacity 140ms ease;
+    will-change: transform;
+    transition: opacity 140ms ease;
+    position: relative;
+    z-index: 2;
 }
 
 .audio-player__progress-bar:focus-visible {
@@ -1625,15 +1603,14 @@ body[data-theme="light"] .floating-heading {
 
 .audio-player__progress-bar:disabled {
     cursor: not-allowed;
-    opacity: 0.45;
-    background-size: 0 0;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    opacity: 0.6;
 }
 
 .audio-player__progress-bar::-webkit-slider-runnable-track {
     height: 0.5rem;
     border-radius: 999px;
-    background: transparent;
+    background: transparent !important;
+    border: none;
 }
 
 .audio-player__progress-bar::-webkit-slider-thumb {
@@ -1667,6 +1644,7 @@ body[data-theme="light"] .floating-heading {
     height: 0.5rem;
     border-radius: 999px;
     background: transparent;
+    border: none;
 }
 
 .audio-player__progress-bar::-moz-range-thumb {
