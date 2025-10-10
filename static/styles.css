@@ -1288,7 +1288,8 @@ body[data-theme="light"] .floating-heading {
     .audio-player::after,
     .audio-progress-visualizer,
     .audio-progress-visualizer__fill,
-    .audio-progress-visualizer__bar {
+    .audio-progress-visualizer__line,
+    .audio-progress-visualizer__line::after {
         transition: none !important;
         animation: none !important;
     }
@@ -1300,7 +1301,7 @@ body[data-theme="light"] .floating-heading {
     display: flex;
     flex-direction: column;
     gap: 1.35rem;
-    padding: 2.6rem 2.8rem 2.4rem;
+    padding: 3.4rem 2.8rem 3rem;
     border: 1.8px solid color-mix(in srgb, var(--border-strong) 40%, var(--accent) 60%);
     border-radius: clamp(26px, 4vw, 44px);
     box-shadow: 0 48px 120px rgba(0, 0, 0, 0.38);
@@ -1392,14 +1393,13 @@ body[data-theme="light"] .floating-heading {
 .audio-player__close {
     display: inline-flex;
     align-items: center;
-    gap: 0.55rem;
     background: color-mix(in srgb, var(--bg-panel) 75%, transparent);
     border: 1.4px solid color-mix(in srgb, var(--border-subtle) 55%, transparent);
     color: var(--text-primary);
     cursor: pointer;
     font-size: clamp(1rem, 1.4vw, 1.15rem);
-    padding: 0.45rem 0.95rem;
-    border-radius: var(--radius-pill);
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
     transition:
         color 150ms ease,
         background 150ms ease,
@@ -1415,14 +1415,8 @@ body[data-theme="light"] .floating-heading {
 }
 
 .audio-player__close-icon {
-    font-size: 1.2em;
+    font-size: 1.15em;
     line-height: 1;
-}
-
-.audio-player__close-label {
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
 }
 
 .audio-player__title {
@@ -1461,123 +1455,163 @@ body[data-theme="light"] .floating-heading {
     background: transparent;
     box-shadow: none;
     transition: opacity 220ms ease;
-    --audio-progress-visualizer-ratio: 0;
+    --visualizer-progress: 0;
 }
 
 .audio-progress-visualizer__fill {
-    width: 100%;
+    width: calc(var(--visualizer-progress, 0) * 100%);
     max-width: 100%;
     height: 100%;
     display: flex;
     align-items: flex-end;
-    gap: clamp(0.12rem, 0.5vw, 0.28rem);
+    gap: clamp(0.06rem, 0.28vw, 0.16rem);
     border-radius: inherit;
     padding: 0;
     overflow: hidden;
     mix-blend-mode: normal;
-    transition: width 200ms ease-out, opacity 160ms ease-out;
+    transition:
+        width 180ms ease-out,
+        opacity 160ms ease-out;
     opacity: 0;
 }
 
-.audio-progress-visualizer__bar {
-    --bar-gradient-a: color-mix(in srgb, var(--accent) 85%, #ffffff 15%);
-    --bar-gradient-b: color-mix(in srgb, #9ad7ff 72%, var(--accent) 28%);
+.audio-progress-visualizer__line {
+    position: relative;
     flex: 1 1 0;
-    min-width: clamp(0.14rem, 0.6vw, 0.34rem);
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    min-width: clamp(0.08rem, 0.32vw, 0.18rem);
     height: 100%;
-    border-radius: 999px;
-    background: linear-gradient(180deg, var(--bar-gradient-a), var(--bar-gradient-b));
     opacity: 0.25;
-    transform: scaleY(0.18);
-    transform-origin: 50% 100%;
-    animation: audioEqualizerPulse 1.6s ease-in-out infinite;
-    animation-play-state: paused;
-    transition:
-        transform 200ms ease,
-        opacity 180ms ease;
+    transition: opacity 180ms ease;
 }
 
-.audio-progress-visualizer__bar.is-active {
-    opacity: 0.88;
-    transform: scaleY(0.6);
-    filter: drop-shadow(0 6px 16px rgba(78, 162, 255, 0.26));
+.audio-progress-visualizer__line::after {
+    content: "";
+    width: clamp(1.5px, 0.22vw, 3px);
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--accent) 85%, #ffffff 15%),
+        color-mix(in srgb, #9ad7ff 72%, var(--accent) 28%)
+    );
+    transform: translateY(0) scaleY(0.12);
+    transform-origin: 50% 100%;
+    box-shadow: none;
+    transition:
+        transform 200ms ease,
+        box-shadow 200ms ease,
+        opacity 180ms ease;
+    animation: none;
+}
+
+.audio-progress-visualizer__line.is-active {
+    opacity: 0.92;
+}
+
+.audio-progress-visualizer__line.is-active::after {
+    transform: translateY(0) scaleY(0.64);
+    box-shadow: 0 8px 18px rgba(78, 162, 255, 0.26);
+    animation: audioEqualizerPulse 1.45s ease-in-out infinite alternate;
+    animation-play-state: paused;
 }
 
 .audio-player[data-state="ready"] .audio-progress-visualizer__fill,
 .audio-player[data-state="playing"] .audio-progress-visualizer__fill {
     opacity: 1;
 }
-.audio-player--playing .audio-progress-visualizer__bar.is-active {
+
+.audio-player--playing .audio-progress-visualizer__line.is-active::after {
     animation-play-state: running;
 }
 
-.audio-progress-visualizer__bar:nth-child(2) {
-    animation-delay: 0.18s;
-    animation-duration: 1.3s;
+.audio-progress-visualizer__line:nth-child(2n).is-active::after {
+    animation-direction: alternate-reverse;
 }
 
-.audio-progress-visualizer__bar:nth-child(3) {
-    animation-delay: 0.32s;
+body[data-theme="light"] .audio-progress-visualizer__line::after {
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--accent) 70%, #ffffff 30%),
+        color-mix(in srgb, #6abfff 68%, var(--accent) 32%)
+    );
 }
 
-.audio-progress-visualizer__bar:nth-child(4) {
-    animation-delay: 0.44s;
-    animation-duration: 1.45s;
+.audio-player[data-state="idle"] .audio-progress-visualizer__line.is-active::after {
+    transform: translateY(0) scaleY(0.32);
 }
 
-.audio-progress-visualizer__bar:nth-child(5) {
-    animation-delay: 0.56s;
+.audio-player[data-state="ready"] .audio-progress-visualizer__line.is-active::after {
+    transform: translateY(0) scaleY(0.5);
 }
 
-.audio-progress-visualizer__bar:nth-child(6) {
-    animation-delay: 0.7s;
-    animation-duration: 1.35s;
+.audio-player[data-state="playing"] .audio-progress-visualizer__line.is-active::after {
+    transform: translateY(0) scaleY(0.76);
 }
 
-.audio-progress-visualizer__bar:nth-child(7) {
-    animation-delay: 0.84s;
-    animation-duration: 1.52s;
+.audio-progress-visualizer__line:nth-child(12n + 1).is-active::after {
+    animation-delay: 0s;
+    animation-duration: 1.28s;
 }
 
-.audio-progress-visualizer__bar:nth-child(8) {
-    animation-delay: 0.98s;
-    animation-duration: 1.38s;
-}
-
-.audio-progress-visualizer__bar:nth-child(9) {
-    animation-delay: 1.12s;
-    animation-duration: 1.62s;
-}
-
-.audio-progress-visualizer__bar:nth-child(10) {
-    animation-delay: 1.26s;
+.audio-progress-visualizer__line:nth-child(12n + 2).is-active::after {
+    animation-delay: 0.04s;
     animation-duration: 1.34s;
 }
 
-.audio-progress-visualizer__bar:nth-child(11) {
-    animation-delay: 1.4s;
-    animation-duration: 1.5s;
+.audio-progress-visualizer__line:nth-child(12n + 3).is-active::after {
+    animation-delay: 0.08s;
+    animation-duration: 1.26s;
 }
 
-.audio-progress-visualizer__bar:nth-child(12) {
-    animation-delay: 1.54s;
+.audio-progress-visualizer__line:nth-child(12n + 4).is-active::after {
+    animation-delay: 0.12s;
+    animation-duration: 1.38s;
+}
+
+.audio-progress-visualizer__line:nth-child(12n + 5).is-active::after {
+    animation-delay: 0.16s;
+    animation-duration: 1.3s;
+}
+
+.audio-progress-visualizer__line:nth-child(12n + 6).is-active::after {
+    animation-delay: 0.2s;
+    animation-duration: 1.42s;
+}
+
+.audio-progress-visualizer__line:nth-child(12n + 7).is-active::after {
+    animation-delay: 0.24s;
+    animation-duration: 1.32s;
+}
+
+.audio-progress-visualizer__line:nth-child(12n + 8).is-active::after {
+    animation-delay: 0.28s;
     animation-duration: 1.4s;
 }
 
-.audio-player[data-state="idle"] .audio-progress-visualizer__bar.is-active {
-    transform: scaleY(0.32);
+.audio-progress-visualizer__line:nth-child(12n + 9).is-active::after {
+    animation-delay: 0.32s;
+    animation-duration: 1.3s;
 }
 
-.audio-player[data-state="ready"] .audio-progress-visualizer__bar.is-active {
-    transform: scaleY(0.52);
+.audio-progress-visualizer__line:nth-child(12n + 10).is-active::after {
+    animation-delay: 0.36s;
+    animation-duration: 1.38s;
 }
 
-.audio-player[data-state="playing"] .audio-progress-visualizer__bar.is-active {
-    transform: scaleY(0.7);
+.audio-progress-visualizer__line:nth-child(12n + 11).is-active::after {
+    animation-delay: 0.4s;
+    animation-duration: 1.29s;
+}
+
+.audio-progress-visualizer__line:nth-child(12n).is-active::after {
+    animation-delay: 0.44s;
+    animation-duration: 1.36s;
 }
 
 .audio-player__progress-bar {
-    --progress-ratio: 0;
     width: 100%;
     height: 0.5rem;
     border-radius: 999px;
@@ -1621,7 +1655,8 @@ body[data-theme="light"] .floating-heading {
     background: color-mix(in srgb, #ffffff 85%, var(--accent) 15%);
     border: 2px solid color-mix(in srgb, var(--accent) 70%, #9ad7ff 30%);
     box-shadow: 0 6px 18px rgba(8, 11, 22, 0.45);
-    margin-top: calc((0.5rem - 1.05rem) / 2);
+    margin-top: calc((0.5rem - 1.05rem) / 2 - 0.15rem);
+    transform: translateY(-0.15rem);
     transition:
         transform 140ms ease,
         box-shadow 140ms ease,
@@ -1635,7 +1670,7 @@ body[data-theme="light"] .floating-heading {
 }
 
 .audio-player__progress-bar::-webkit-slider-thumb:active {
-    transform: scale(1.08);
+    transform: translateY(-0.15rem) scale(1.08);
     box-shadow: 0 10px 24px rgba(24, 137, 255, 0.42);
     border-color: color-mix(in srgb, var(--accent) 85%, #ffffff 15%);
 }
@@ -1654,6 +1689,7 @@ body[data-theme="light"] .floating-heading {
     background: color-mix(in srgb, #ffffff 85%, var(--accent) 15%);
     border: 2px solid color-mix(in srgb, var(--accent) 70%, #9ad7ff 30%);
     box-shadow: 0 6px 18px rgba(8, 11, 22, 0.45);
+    transform: translateY(-0.15rem);
     transition:
         transform 140ms ease,
         box-shadow 140ms ease,
@@ -1667,7 +1703,7 @@ body[data-theme="light"] .floating-heading {
 }
 
 .audio-player__progress-bar::-moz-range-thumb:active {
-    transform: scale(1.08);
+    transform: translateY(-0.15rem) scale(1.08);
     box-shadow: 0 10px 24px rgba(24, 137, 255, 0.42);
     border-color: color-mix(in srgb, var(--accent) 85%, #ffffff 15%);
 }
@@ -1738,22 +1774,22 @@ body[data-theme="light"] .floating-heading {
 
 @keyframes audioEqualizerPulse {
     0% {
-        transform: scaleY(0.2);
+        transform: translateY(0) scaleY(0.3);
     }
-    15% {
-        transform: scaleY(0.85);
+    18% {
+        transform: translateY(-28%) scaleY(0.92);
     }
-    35% {
-        transform: scaleY(0.35);
+    38% {
+        transform: translateY(18%) scaleY(0.46);
     }
-    55% {
-        transform: scaleY(1);
+    58% {
+        transform: translateY(-24%) scaleY(0.88);
     }
-    75% {
-        transform: scaleY(0.4);
+    78% {
+        transform: translateY(14%) scaleY(0.54);
     }
     100% {
-        transform: scaleY(0.25);
+        transform: translateY(0) scaleY(0.3);
     }
 }
 

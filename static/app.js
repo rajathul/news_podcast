@@ -44,17 +44,17 @@ const audioStopControl = document.getElementById("audioStopControl");
 const audioCloseControl = document.getElementById("audioCloseControl");
 const audioProgressVisualizer = document.getElementById("audioProgressVisualizer");
 const audioProgressBars = audioProgressVisualizer
-    ? Array.from(audioProgressVisualizer.querySelectorAll(".audio-progress-visualizer__bar"))
+    ? Array.from(audioProgressVisualizer.querySelectorAll(".audio-progress-visualizer__line"))
     : [];
 const floatingHeading = document.createElement("div");
 floatingHeading.id = "floatingHeading";
 floatingHeading.className = "floating-heading";
 floatingHeading.hidden = true;
 
-audioProgressVisualizer?.style.setProperty("--audio-progress-visualizer-ratio", "0");
 if (audioProgressBars.length) {
     updateAudioVisualizerBars(0, false);
 }
+audioProgressVisualizer?.style.setProperty("--visualizer-progress", "0");
 
 sourcesList.addEventListener("click", handleSourceFilterInteraction);
 sourcesList.addEventListener("keydown", event => {
@@ -693,13 +693,13 @@ function setAudioVisualizerRatio(ratio, hasDuration = true) {
     const isPlaying = Boolean(audioPlayer && !audioPlayer.paused && !audioPlayer.ended);
     let nextRatio = Number.isFinite(ratio) ? ratio : 0;
     nextRatio = Math.max(0, Math.min(nextRatio, 1));
-    if (isPlaying) {
-        const minimum = hasDuration ? 0.08 : 0.12;
-        nextRatio = Math.max(nextRatio, minimum);
+    let appliedRatio = nextRatio;
+    if (isPlaying && audioProgressBars.length) {
+        const minimumVisible = 1 / audioProgressBars.length;
+        appliedRatio = Math.max(appliedRatio, minimumVisible);
     }
-    const ratioString = nextRatio.toFixed(5);
-    audioProgressVisualizer.style.setProperty("--audio-progress-visualizer-ratio", ratioString);
-    updateAudioVisualizerBars(nextRatio, isPlaying);
+    audioProgressVisualizer?.style.setProperty("--visualizer-progress", appliedRatio.toFixed(5));
+    updateAudioVisualizerBars(appliedRatio, isPlaying);
 }
 
 function updateAudioVisualizerBars(ratio, isPlaying) {
@@ -708,15 +708,16 @@ function updateAudioVisualizerBars(ratio, isPlaying) {
     }
     const normalizedRatio = Number.isFinite(ratio) ? Math.max(0, Math.min(ratio, 1)) : 0;
     const totalBars = audioProgressBars.length;
-    let activeCount = Math.round(normalizedRatio * totalBars);
+    let activeCount = Math.ceil(normalizedRatio * totalBars);
 
-    if (isPlaying) {
-        const minimumActive = Math.max(1, Math.ceil(totalBars * 0.2));
-        activeCount = Math.max(activeCount, minimumActive);
-    } else if (normalizedRatio > 0) {
-        activeCount = Math.max(activeCount, 1);
+    if (normalizedRatio <= 0) {
+        activeCount = isPlaying ? 1 : 0;
     } else {
-        activeCount = 0;
+        activeCount = Math.max(activeCount, 1);
+        if (isPlaying) {
+            const easedCount = Math.max(1, Math.ceil(normalizedRatio * totalBars));
+            activeCount = Math.max(activeCount, easedCount);
+        }
     }
     activeCount = Math.min(totalBars, activeCount);
 
@@ -838,7 +839,18 @@ function stopAudioPlayback() {
 }
 
 function handleGlobalAudioEnded() {
-    stopAudioPlayback();
+    if (!audioPlayer) {
+        return;
+    }
+    stopAudioProgressAnimation();
+    updateAudioPlayerStatusText();
+    updateAudioToggleControl(false, Boolean(audioPlayer.currentSrc));
+    const feedUrl = audioPlayer.dataset.feedUrl || null;
+    if (feedUrl) {
+        rememberAudioTitle(feedUrl, audioPlayer.dataset.feedTitle || getAudioTitle(feedUrl));
+        setCurrentAudioFeed(feedUrl);
+    }
+    syncAudioPlayerVisualState();
 }
 
 function handleGlobalAudioPause() {
@@ -847,7 +859,16 @@ function handleGlobalAudioPause() {
     }
     stopAudioProgressAnimation();
     updateAudioPlayerStatusText();
-    if (audioPlayer.ended || audioPlayer.currentTime === 0) {
+    if (audioPlayer.ended) {
+        const feedUrl = audioPlayer.dataset.feedUrl || null;
+        if (feedUrl) {
+            rememberAudioTitle(feedUrl, audioPlayer.dataset.feedTitle || getAudioTitle(feedUrl));
+            setCurrentAudioFeed(feedUrl);
+        }
+        syncAudioPlayerVisualState();
+        return;
+    }
+    if (audioPlayer.currentTime === 0 && !audioPlayer.currentSrc) {
         hideAudioPlayerShell();
         setCurrentAudioFeed(null);
     } else {
