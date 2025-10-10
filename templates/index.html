@@ -174,10 +174,27 @@
     <div id="panelAudioPlayerShell" class="audio-player" hidden>
         <div class="audio-player__header">
             <span class="audio-player__badge">Now playing</span>
-            <button type="button" class="audio-player__close" id="audioCloseControl" aria-label="Close audio player">✕</button>
+            <button type="button" class="audio-player__close" id="audioCloseControl">
+                <span class="audio-player__close-icon" aria-hidden="true">×</span>
+                <span class="audio-player__close-label">Close</span>
+            </button>
         </div>
         <div class="audio-player__title" id="panelAudioPlayerTitle">Podcast audio</div>
         <div class="audio-player__status" id="panelAudioPlayerStatus">Ready • 00:00 / --:--</div>
+        <div class="audio-player__visualizer" id="audioPlayerVisualizer" aria-hidden="true">
+            <span class="audio-player__bar" style="--bar-index: 0; --bar-peak: 0.5;"></span>
+            <span class="audio-player__bar" style="--bar-index: 1; --bar-peak: 0.9;"></span>
+            <span class="audio-player__bar" style="--bar-index: 2; --bar-peak: 0.7;"></span>
+            <span class="audio-player__bar" style="--bar-index: 3; --bar-peak: 1;"></span>
+            <span class="audio-player__bar" style="--bar-index: 4; --bar-peak: 0.85;"></span>
+            <span class="audio-player__bar" style="--bar-index: 5; --bar-peak: 0.6;"></span>
+            <span class="audio-player__bar" style="--bar-index: 6; --bar-peak: 0.65;"></span>
+            <span class="audio-player__bar" style="--bar-index: 7; --bar-peak: 0.95;"></span>
+            <span class="audio-player__bar" style="--bar-index: 8; --bar-peak: 0.75;"></span>
+            <span class="audio-player__bar" style="--bar-index: 9; --bar-peak: 0.6;"></span>
+            <span class="audio-player__bar" style="--bar-index: 10; --bar-peak: 0.9;"></span>
+            <span class="audio-player__bar" style="--bar-index: 11; --bar-peak: 0.55;"></span>
+        </div>
         <div class="audio-player__controls">
             <button type="button" class="audio-player__button audio-player__button--primary" id="audioToggleControl">Play</button>
             <button type="button" class="audio-player__button" id="audioStopControl">Stop</button>

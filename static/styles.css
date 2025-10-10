@@ -708,6 +708,10 @@ body[data-theme="light"] .panel__eyebrow {
     color: color-mix(in srgb, var(--text-primary) 70%, #ff7a7a 30%);
 }
 
+.has-active-audio-player .panel__audio-button {
+    display: none !important;
+}
+
 .panel--loading {
     opacity: 0.7;
     transform: translateY(0);
@@ -1278,7 +1282,11 @@ body[data-theme="light"] .floating-heading {
     .panel .card,
     .panel.is-active .card,
     .card:hover,
-    .refresh-button {
+    .refresh-button,
+    .audio-player,
+    .audio-player::before,
+    .audio-player::after,
+    .audio-player__bar {
         transition: none !important;
         animation: none !important;
     }
@@ -1289,19 +1297,55 @@ body[data-theme="light"] .floating-heading {
     bottom: clamp(1rem, 5vw, 3rem);
     display: flex;
     flex-direction: column;
-    gap: 0.8rem;
-    padding: 1.4rem 1.8rem 1.6rem;
+    gap: 1.35rem;
+    padding: 2.6rem 2.8rem 2.4rem;
     background: linear-gradient(
-        140deg,
-        color-mix(in srgb, var(--bg-elevated) 90%, var(--accent) 10%),
-        color-mix(in srgb, var(--bg-panel) 92%, transparent)
+        150deg,
+        color-mix(in srgb, var(--bg-elevated) 55%, var(--accent) 45%),
+        color-mix(in srgb, var(--bg-panel) 65%, var(--bg-body) 35%)
     );
-    border: 1.6px solid color-mix(in srgb, var(--border-strong) 50%, var(--accent) 50%);
-    border-radius: clamp(18px, 3vw, 30px);
-    box-shadow: 0 38px 90px rgba(0, 0, 0, 0.35);
-    max-width: min(440px, 92vw);
+    border: 1.8px solid color-mix(in srgb, var(--border-strong) 40%, var(--accent) 60%);
+    border-radius: clamp(26px, 4vw, 44px);
+    box-shadow: 0 48px 120px rgba(0, 0, 0, 0.38);
+    max-width: min(880px, 94vw);
     z-index: 60;
     backdrop-filter: blur(26px);
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.audio-player::before,
+.audio-player::after {
+    content: "";
+    position: absolute;
+    inset: -35%;
+    z-index: -1;
+    opacity: 0.65;
+    pointer-events: none;
+    background: conic-gradient(
+        from 180deg,
+        color-mix(in srgb, var(--accent) 70%, #101622 30%) 0deg,
+        color-mix(in srgb, var(--accent) 40%, #080808 60%) 110deg,
+        color-mix(in srgb, var(--accent) 65%, #1d2333 35%) 220deg,
+        color-mix(in srgb, var(--accent) 58%, #0b1b33 42%) 360deg
+    );
+    filter: blur(190px);
+    transition: opacity 280ms ease;
+    animation: audioPlayerGradient 18s linear infinite;
+    animation-play-state: paused;
+}
+
+.audio-player::after {
+    inset: -50%;
+    opacity: 0.4;
+    filter: blur(210px);
+    animation-duration: 26s;
+    animation-direction: reverse;
+}
+
+.audio-player--active::before,
+.audio-player--active::after {
+    animation-play-state: running;
 }
 
 .audio-player[hidden] {
@@ -1316,7 +1360,7 @@ body[data-theme="light"] .floating-heading {
 }
 
 .audio-player__badge {
-    font-size: 0.78rem;
+    font-size: 0.92rem;
     text-transform: uppercase;
     letter-spacing: 0.18em;
     font-weight: 700;
@@ -1324,41 +1368,114 @@ body[data-theme="light"] .floating-heading {
 }
 
 .audio-player__close {
-    background: transparent;
-    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    background: color-mix(in srgb, var(--bg-panel) 75%, transparent);
+    border: 1.4px solid color-mix(in srgb, var(--border-subtle) 55%, transparent);
     color: var(--text-primary);
     cursor: pointer;
-    font-size: 1.2rem;
-    padding: 0.1rem;
+    font-size: clamp(1rem, 1.4vw, 1.15rem);
+    padding: 0.45rem 0.95rem;
+    border-radius: var(--radius-pill);
+    transition:
+        color 150ms ease,
+        background 150ms ease,
+        border-color 150ms ease,
+        transform 120ms ease;
 }
 
 .audio-player__close:is(:hover, :focus-visible) {
-    color: var(--accent);
+    color: var(--bg-body);
+    background: color-mix(in srgb, var(--accent) 60%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 70%, var(--border-subtle) 30%);
+    transform: translateY(-1px);
+}
+
+.audio-player__close-icon {
+    font-size: 1.2em;
+    line-height: 1;
+}
+
+.audio-player__close-label {
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
 .audio-player__title {
     font-family: var(--font-display);
-    font-size: clamp(1.3rem, 2vw, 1.6rem);
+    font-size: clamp(1.8rem, 2.8vw, 2.4rem);
     margin: 0;
     line-height: 1.2;
 }
 
 .audio-player__status {
-    font-size: 0.88rem;
+    font-size: 1rem;
     color: var(--text-secondary);
+}
+
+.audio-player__visualizer {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+    height: 3.6rem;
+    padding: 0.45rem 0.2rem 0.35rem;
+    pointer-events: none;
+}
+
+.audio-player__visualizer::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--bg-panel) 60%, transparent),
+        transparent 60%
+    );
+    opacity: 0.55;
+}
+
+.audio-player__bar {
+    flex: 1 1 0;
+    min-width: 6px;
+    height: 100%;
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, #ffffff 80%, var(--accent) 20%),
+        color-mix(in srgb, #9ad7ff 40%, var(--accent) 60%)
+    );
+    border-radius: 999px;
+    transform-origin: center bottom;
+    transform: scaleY(calc(0.25 + var(--bar-peak, 0.8) * 0.25));
+    opacity: 0.9;
+    animation: audioBarPulse 1.6s ease-in-out infinite both;
+    animation-delay: calc(var(--bar-index, 0) * 65ms);
+    animation-play-state: paused;
+}
+
+.audio-player--active .audio-player__bar {
+    opacity: 1;
+    box-shadow: 0 0 18px rgba(255, 255, 255, 0.35);
+}
+
+.audio-player--playing .audio-player__bar {
+    animation-play-state: running;
 }
 
 .audio-player__controls {
     display: flex;
-    gap: 0.75rem;
+    gap: 1.15rem;
 }
 
 .audio-player__button {
     flex: 1 1 auto;
     border-radius: var(--radius-pill);
     border: 1.6px solid color-mix(in srgb, var(--border-subtle) 60%, var(--accent) 40%);
-    padding: 0.55rem 0.9rem;
-    font-size: 0.85rem;
+    padding: 0.9rem 1.6rem;
+    font-size: 1rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -1392,4 +1509,23 @@ body[data-theme="light"] .floating-heading {
 .audio-player__button--primary:is(:hover, :focus-visible) {
     background: color-mix(in srgb, var(--accent), var(--bg-body) 15%);
     color: var(--bg-body);
+}
+
+@keyframes audioPlayerGradient {
+    from {
+        transform: rotate(0deg) scale(1.1);
+    }
+    to {
+        transform: rotate(360deg) scale(1.1);
+    }
+}
+
+@keyframes audioBarPulse {
+    0%,
+    100% {
+        transform: scaleY(calc(0.28 + var(--bar-peak, 0.85) * 0.24));
+    }
+    50% {
+        transform: scaleY(calc(0.4 + var(--bar-peak, 0.85) * 0.9));
+    }
 }

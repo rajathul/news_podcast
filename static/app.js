@@ -32,6 +32,7 @@ const audioPlayer = document.getElementById("panelAudioPlayer");
 const audioPlayerShell = document.getElementById("panelAudioPlayerShell");
 const audioPlayerTitle = document.getElementById("panelAudioPlayerTitle");
 const audioPlayerStatus = document.getElementById("panelAudioPlayerStatus");
+const audioPlayerVisualizer = document.getElementById("audioPlayerVisualizer");
 const audioToggleControl = document.getElementById("audioToggleControl");
 const audioStopControl = document.getElementById("audioStopControl");
 const audioCloseControl = document.getElementById("audioCloseControl");
@@ -105,6 +106,8 @@ if (audioCloseControl) {
         stopAudioPlayback();
     });
 }
+
+syncAudioPlayerVisualState();
 
 function createSourceId() {
     sourceSequence += 1;
@@ -407,6 +410,36 @@ function updateAudioButtonElement(button) {
     button.textContent = "Check audio";
 }
 
+function escapeAttributeSelector(value) {
+    if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+        return CSS.escape(value);
+    }
+    return String(value).replace(/["\\]/g, "\\$&");
+}
+
+function getPanelAudioButtons(feedUrl) {
+    if (!feedUrl) {
+        return [];
+    }
+    const selectorValue = escapeAttributeSelector(feedUrl);
+    return Array.from(document.querySelectorAll(`.panel__audio-button[data-feed-url="${selectorValue}"]`));
+}
+
+function setPanelAudioButtonsVisibility(feedUrl, isVisible) {
+    if (!feedUrl) {
+        return;
+    }
+    getPanelAudioButtons(feedUrl).forEach(button => {
+        button.hidden = !isVisible;
+    });
+}
+
+function revealAllPanelAudioButtons() {
+    document.querySelectorAll(".panel__audio-button[hidden]").forEach(button => {
+        button.hidden = false;
+    });
+}
+
 async function handlePanelAudioClick(event) {
     const button = event.currentTarget;
     const feedUrl = button?.dataset?.feedUrl;
@@ -459,6 +492,7 @@ function playPanelAudio(feedUrl, status, titleLabel) {
     if (titleLabel) {
         audioPlayer.dataset.feedTitle = titleLabel;
     }
+    setPanelAudioButtonsVisibility(feedUrl, false);
     openAudioPlayerShell(feedUrl, titleLabel);
     updateAudioToggleControl(false, true);
     audioPlayer
@@ -469,7 +503,8 @@ function playPanelAudio(feedUrl, status, titleLabel) {
         })
         .catch(error => {
             console.warn("Unable to start audio playback:", error);
-            updateAudioToggleControl(false, Boolean(audioPlayer.src));
+            setPanelAudioButtonsVisibility(feedUrl, true);
+            updateAudioToggleControl(false, Boolean(audioPlayer.currentSrc));
         });
 }
 
@@ -482,19 +517,37 @@ function resolveAudioSourceUrl(status) {
 }
 
 function updateAudioToggleControl(isPlaying, hasSource) {
-    if (!audioToggleControl) {
+    if (audioToggleControl) {
+        audioToggleControl.textContent = isPlaying ? "Pause" : "Play";
+        audioToggleControl.dataset.state = isPlaying ? "pause" : "play";
+        audioToggleControl.disabled = !hasSource;
+    }
+    syncAudioPlayerVisualState();
+}
+
+function syncAudioPlayerVisualState() {
+    if (!audioPlayerShell) {
         return;
     }
-    audioToggleControl.textContent = isPlaying ? "Pause" : "Play";
-    audioToggleControl.dataset.state = isPlaying ? "pause" : "play";
-    audioToggleControl.disabled = !hasSource;
+    const hasSource = Boolean(audioPlayer?.currentSrc);
+    const isPlaying = Boolean(audioPlayer && !audioPlayer.paused && !audioPlayer.ended);
+    const isVisible = !audioPlayerShell.hidden;
+    const shouldAnimate = isVisible && (hasSource || isPlaying);
+
+    audioPlayerShell.classList.toggle("audio-player--active", shouldAnimate);
+    audioPlayerShell.classList.toggle("audio-player--playing", isVisible && isPlaying);
+
+    if (audioPlayerVisualizer) {
+        const visualState = isPlaying ? "playing" : hasSource ? "ready" : "idle";
+        audioPlayerVisualizer.dataset.state = visualState;
+    }
 }
 
 function handleAudioToggleControl() {
     if (!audioPlayer) {
         return;
     }
-    const hasSource = Boolean(audioPlayer.src);
+    const hasSource = Boolean(audioPlayer.currentSrc);
     if (!hasSource) {
         const fallbackFeed = audioPlayer.dataset.feedUrl || state.currentAudioFeed;
         if (fallbackFeed) {
@@ -532,6 +585,7 @@ function openAudioPlayerShell(feedUrl, titleLabel) {
         audioPlayerTitle.textContent = getAudioTitle(feedUrl);
     }
     audioPlayerShell.hidden = false;
+    body?.classList.add("has-active-audio-player");
     updateAudioPlayerStatusText();
     updateAudioToggleControl(!audioPlayer?.paused && !audioPlayer?.ended, Boolean(audioPlayer?.src));
 }
@@ -542,6 +596,9 @@ function hideAudioPlayerShell() {
     }
     audioPlayerShell.hidden = true;
     audioPlayerShell.dataset.feedUrl = "";
+    audioPlayerShell.classList.remove("audio-player--active", "audio-player--playing");
+    body?.classList.remove("has-active-audio-player");
+    syncAudioPlayerVisualState();
 }
 
 function updateAudioPlayerStatusText() {
@@ -557,9 +614,9 @@ function updateAudioPlayerStatusText() {
             ? "Playing"
             : audioPlayer.currentTime > 0
                 ? "Paused"
-                : "Ready";
+            : "Ready";
     audioPlayerStatus.textContent = `${statusLabel} • ${current} / ${duration}`;
-    updateAudioToggleControl(isPlaying, Boolean(audioPlayer.src));
+    updateAudioToggleControl(isPlaying, Boolean(audioPlayer.currentSrc));
 }
 
 function formatClockTime(seconds) {
@@ -586,6 +643,7 @@ function stopAudioPlayback() {
     updateAudioToggleControl(false, false);
     setCurrentAudioFeed(null);
     hideAudioPlayerShell();
+    syncAudioPlayerVisualState();
 }
 
 function handleGlobalAudioEnded() {
@@ -607,6 +665,7 @@ function handleGlobalAudioPause() {
             setCurrentAudioFeed(feedUrl);
         }
     }
+    syncAudioPlayerVisualState();
 }
 
 function handleGlobalAudioPlay() {
@@ -620,18 +679,27 @@ function handleGlobalAudioPlay() {
         openAudioPlayerShell(feedUrl, title);
     }
     setCurrentAudioFeed(feedUrl);
+    syncAudioPlayerVisualState();
 }
 
 function setCurrentAudioFeed(feedUrl) {
-    if (state.currentAudioFeed === feedUrl) {
+    const previousFeed = state.currentAudioFeed;
+    if (previousFeed === feedUrl) {
         refreshRenderedAudioButtons();
         updateAudioPlayerStatusText();
         return;
     }
     state.currentAudioFeed = feedUrl;
+
+    if (previousFeed && previousFeed !== feedUrl) {
+        setPanelAudioButtonsVisibility(previousFeed, true);
+    }
+
     if (feedUrl) {
+        setPanelAudioButtonsVisibility(feedUrl, false);
         openAudioPlayerShell(feedUrl, getAudioTitle(feedUrl));
     } else {
+        revealAllPanelAudioButtons();
         hideAudioPlayerShell();
     }
     refreshRenderedAudioButtons();
