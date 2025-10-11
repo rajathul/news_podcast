@@ -239,6 +239,7 @@ async function loadArticles(showSkeleton = true) {
         lastRefreshed.dateTime = "";
         lastRefreshed.textContent = "";
         updateSourcesList();
+        updatePresetButtonStates();
         detachPanelProgressListeners();
         floatingHeading.hidden = true;
         return;
@@ -294,6 +295,7 @@ async function loadArticles(showSkeleton = true) {
         state.items = aggregated;
         state.feedErrors = errors;
         updateSourcesList(counts);
+        updatePresetButtonStates();
         updateTimestamp(new Date());
 
         if (errors.length) {
@@ -1888,6 +1890,50 @@ function toggleAddFeedForm(show) {
     addFeedButton.hidden = false;
 }
 
+function updatePresetButtonStates() {
+    document.querySelectorAll(".preset-feed-button").forEach(button => {
+        const feedUrl = button.dataset.feed;
+        const isActive = state.sources.some(source => source.feed === feedUrl);
+        button.classList.toggle("is-active", isActive);
+    });
+}
+
+function handlePresetFeedClick(event) {
+    const button = event.currentTarget;
+    const feedUrl = button.dataset.feed;
+    const feedName = button.dataset.name;
+    
+    if (!feedUrl) {
+        return;
+    }
+    
+    // Toggle button state
+    const isActive = button.classList.contains("is-active");
+    
+    if (isActive) {
+        // Remove the feed
+        button.classList.remove("is-active");
+        const sourceIndex = state.sources.findIndex(source => source.feed === feedUrl);
+        if (sourceIndex !== -1) {
+            state.sources.splice(sourceIndex, 1);
+            loadArticles(true);
+        }
+    } else {
+        // Add the feed
+        button.classList.add("is-active");
+        const existingSource = state.sources.find(source => source.feed === feedUrl);
+        if (!existingSource) {
+            const newSource = createSource({
+                feed: feedUrl,
+                title: feedName,
+                url: feedUrl
+            });
+            state.sources.push(newSource);
+            loadArticles(true);
+        }
+    }
+}
+
 function addSource(feedUrl) {
     const normalized = normalizeUrl(feedUrl);
     const duplicate = state.sources.some(source => {
@@ -1903,6 +1949,7 @@ function addSource(feedUrl) {
 
     state.sources.push(createSource({ feed: normalized, title: null, url: normalized }));
     updateSourcesList();
+    updatePresetButtonStates();
     toggleAddFeedForm(false);
     loadArticles(true);
 }
@@ -2120,6 +2167,11 @@ historyPopup.addEventListener("click", event => {
     if (event.target === historyPopup) {
         closeHistoryPopup();
     }
+});
+
+// Add preset feed button handlers
+document.querySelectorAll(".preset-feed-button").forEach(button => {
+    button.addEventListener("click", handlePresetFeedClick);
 });
 
 applyTheme(loadThemePreference());

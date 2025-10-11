@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
     <title>News Feed Viewer</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,7 +12,8 @@
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
 </head>
 
 <body data-theme="dark">
@@ -42,22 +44,52 @@
                             aria-expanded="false" aria-controls="historyPopup" title="Search history">
                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path
-                                    d="M13 3a9 9 0 1 0 8.95 9.78l-1.99-.2A7 7 0 1 1 13 5V3zm1 2h-1v7l5.25 3.15.75-1.23-4-2.37V5z" />
+                                    d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.51 0-2.91-.49-4.06-1.3l-1.42 1.42c1.91 1.91 4.46 3.08 7.48 3.08 5.52 0 10-4.48 10-10S18.52 3 13 3zM12 8v5l4 2-1 2-5-3V8h2z">
+                                </path>
                             </svg>
                         </button>
                     </div>
-                </div>
-                <div class="control-group">
-                    <span class="control-label">Sort</span>
-                    <div class="pill-toggle" role="radiogroup">
-                        <button class="pill-toggle__option is-active" data-sort="latest" aria-pressed="true">Latest
-                            first</button>
-                        <button class="pill-toggle__option" data-sort="original" aria-pressed="false">Feed
-                            order</button>
+                    <div class="control-group control-group--sort">
+                        <span class="control-label">Sort</span>
+                        <div class="pill-toggle" role="radiogroup">
+                            <button class="pill-toggle__option is-active" data-sort="latest" aria-pressed="true">Latest
+                                first</button>
+                            <button class="pill-toggle__option" data-sort="original" aria-pressed="false">Feed
+                                order</button>
+                        </div>
                     </div>
                 </div>
                 <div class="control-group control-group--actions">
                     <span class="control-label">Sources</span>
+                    <div class="preset-feeds">
+                        <button type="button" class="preset-feed-button"
+                            data-feed="https://rss.nytimes.com/services/xml/rss/nyt/World.xml"
+                            data-name="NYT - World News">
+                            NYT - World News
+                        </button>
+                        <button type="button" class="preset-feed-button"
+                            data-feed="https://www.ft.com/markets?format=rss" data-name="FT - Markets">
+                            FT - Markets
+                        </button>
+                        <button type="button" class="preset-feed-button"
+                            data-feed="https://feeds.feedburner.com/ndtvnews-top-stories" data-name="NDTV - India">
+                            NDTV - India
+                        </button>
+                        <button type="button" class="preset-feed-button"
+                            data-feed="https://feeds.bbci.co.uk/sport/rss.xml" data-name="BBC Sports">
+                            BBC Sports
+                        </button>
+                        <button type="button" class="preset-feed-button"
+                            data-feed="https://feeds.feedburner.com/variety/headlines"
+                            data-name="Variety Entertainment">
+                            Variety Entertainment
+                        </button>
+                        <button type="button" class="preset-feed-button"
+                            data-feed="https://frontline.thehindu.com/politics/feeder/default.rss"
+                            data-name="Indian Politics">
+                            Indian Politics
+                        </button>
+                    </div>
                     <div class="add-feed">
                         <button type="button" class="add-feed__toggle" id="addFeedButton">
                             <span>Add feed source</span>
