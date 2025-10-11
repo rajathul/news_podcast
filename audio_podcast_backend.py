@@ -13,13 +13,8 @@ import wave
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
-
-try:
-    from google import genai
-    from google.genai import types
-except ImportError:  # pragma: no cover - optional dependency for real generation
-    genai = None
-    types = None
+from google import genai
+from google.genai import types
 
 
 LOGGER = logging.getLogger("audio_podcast_backend")
@@ -377,7 +372,7 @@ class AudioPodcastManager:
             return [job.to_dict() for job in self._jobs.values()]
 
 
-audio_manager = AudioPodcastManager(use_fake_audio=True)
+audio_manager = AudioPodcastManager()
 
 
 async def ensure_audio_for_feed(feed_url: str, channel_title: str, articles: List[Dict[str, str]]) -> Dict[str, Optional[str]]:
