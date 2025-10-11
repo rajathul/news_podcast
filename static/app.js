@@ -1617,7 +1617,9 @@ function createArticleCard(article) {
     media.className = "card__media";
     if (article.image) {
         const img = document.createElement("img");
-        img.src = article.image;
+        // img.src = article.image;
+        const upgraded = article.image.replace(/^http:\/\//i, "https://");
+        img.src = upgraded;
         img.alt = article.title ? `Image for ${article.title}` : "Story image";
         media.appendChild(img);
     } else {
