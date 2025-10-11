@@ -9,3 +9,5 @@ static/podcasts/*
 !static/podcasts/.gitkeep
 __pycache__/audio_podcast_backend.cpython-312.pyc
 .vscode/settings.json
+__pycache__/rss_viewer.cpython-312.pyc
+__pycache__/rss_viewer.cpython-312.pyc

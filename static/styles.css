@@ -56,6 +56,9 @@ body {
     background: var(--bg-body);
     color: var(--text-primary);
     transition: background-color var(--transition), color var(--transition);
+    /* Prevent horizontal scrolling on mobile */
+    overflow-x: hidden;
+    width: 100%;
 }
 
 a {
@@ -66,15 +69,15 @@ a {
     min-height: 100vh;
     width: 100%;
     margin: 0;
-    padding: 3rem clamp(1.2rem, 4vw, 3rem) 2.6rem;
+    padding: clamp(1.5rem, 4vw, 3rem) clamp(0.8rem, 4vw, 3rem) clamp(2rem, 4vw, 2.6rem);
     display: flex;
     flex-direction: column;
-    gap: 2.2rem;
-    border-radius: clamp(28px, 6vw, 44px);
+    gap: clamp(1.5rem, 3vw, 2.2rem);
+    border-radius: clamp(16px, 6vw, 44px);
     background: linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.12));
     box-shadow:
-        22px 22px 48px rgba(0, 0, 0, 0.28),
-        -18px -18px 40px rgba(255, 255, 255, 0.08);
+        clamp(12px, 3vw, 22px) clamp(12px, 3vw, 22px) clamp(24px, 6vw, 48px) rgba(0, 0, 0, 0.28),
+        clamp(-10px, -2vw, -18px) clamp(-10px, -2vw, -18px) clamp(20px, 5vw, 40px) rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(12px);
 }
 
@@ -159,13 +162,13 @@ a {
 
 .controls {
     display: grid;
-    gap: 1.5rem;
-    padding: 1.8rem;
+    gap: clamp(1rem, 2vw, 1.5rem);
+    padding: clamp(1.2rem, 3vw, 1.8rem);
     border-radius: var(--radius-lg);
     border: 2px solid var(--border-strong);
     background: var(--bg-panel);
     filter: var(--shadow-hard);
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(clamp(200px, 40vw, 240px), 1fr));
     align-items: center;
 }
 
@@ -221,11 +224,14 @@ a {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2.25rem;
-    height: 2.25rem;
+    width: clamp(2.25rem, 6vw, 2.75rem);
+    height: clamp(2.25rem, 6vw, 2.75rem);
     border-radius: var(--radius-sm);
     color: inherit;
     transition: transform var(--transition);
+    /* Better touch target for mobile */
+    min-width: 44px;
+    min-height: 44px;
 }
 
 .history-button svg {
@@ -1207,30 +1213,215 @@ body[data-theme="light"] .floating-heading {
     border-top: 2px solid var(--border-strong);
 }
 
-@media (max-width: 640px) {
+/* Mobile First - Extra Small Devices */
+@media (max-width: 480px) {
     .page-shell {
-        padding: 2.5rem 1.2rem 2.5rem;
+        padding: 1.5rem 0.8rem 2rem;
+        border-radius: 16px;
+        gap: 1.5rem;
+    }
+
+    .hero__title {
+        font-size: 2.2rem;
+        line-height: 1.1;
+    }
+
+    .hero__badge {
+        font-size: 0.7rem;
+        padding: 0.35rem 0.7rem;
+    }
+
+    .theme-toggle {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.8rem;
+    }
+
+    .controls {
+        padding: 1.2rem;
+        gap: 1.2rem;
+        grid-template-columns: 1fr;
+    }
+
+    .control-field {
+        padding: 0.6rem 0.7rem;
+    }
+
+    .control-field input {
+        font-size: 0.9rem;
+    }
+
+    .pill-toggle__option {
+        padding: 0.6rem 0.9rem;
+        font-size: 0.85rem;
+    }
+
+    .add-feed__toggle {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.8rem;
+    }
+
+    .panel {
+        padding: 1.2rem;
+        margin-bottom: 1.5rem;
+        border-radius: 16px;
+    }
+
+    .panel__title {
+        font-size: 1.8rem;
+        line-height: 1.1;
+    }
+
+    .panel__eyebrow {
+        font-size: 0.65rem;
+        padding: 0.15rem 0.4rem;
+    }
+
+    .panel__grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        grid-auto-rows: minmax(180px, auto);
+    }
+
+    .card__body {
+        padding: 0.9rem 1rem 1.1rem;
+        min-height: 140px;
+    }
+
+    .card__title {
+        font-size: 1rem;
+        line-height: 1.2;
+    }
+
+    .card__excerpt {
+        font-size: 0.85rem;
+        line-height: 1.4;
+    }
+
+    .meta {
+        padding: 0.9rem 1rem;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.8rem;
+    }
+
+    .meta__sources {
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+
+    .source-pill {
+        font-size: 0.65rem;
+        padding: 0.25rem 0.5rem;
+    }
+
+    .refresh-button {
+        width: 100%;
+        justify-content: center;
+        margin-left: 0;
+        padding: 0.7rem 1rem;
+    }
+
+    .audio-player {
+        right: 0.5rem;
+        left: 0.5rem;
+        bottom: 0.5rem;
+        max-width: none;
+        padding: 1rem 1.1rem 1.1rem;
+        border-radius: 20px;
+    }
+
+    .audio-player__title {
+        font-size: 0.9rem;
+    }
+
+    .audio-player__controls {
+        gap: 0.8rem;
+    }
+
+    .audio-player__button {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.8rem;
+    }
+}
+
+/* Small Mobile Devices */
+@media (min-width: 481px) and (max-width: 640px) {
+    .page-shell {
+        padding: 2rem 1rem 2.5rem;
+        border-radius: 20px;
     }
 
     .controls {
         grid-template-columns: 1fr;
-    }
-
-    .panels {
-        gap: 3rem;
-        padding-top: 0;
-        padding-bottom: 4rem;
+        padding: 1.4rem;
     }
 
     .panel {
-        position: static;
-        top: auto;
-        min-height: auto;
-        padding: 1.6rem;
-        margin-inline: 0;
+        padding: 1.4rem;
+        margin-bottom: 2rem;
+    }
+
+    .panel__grid {
+        grid-template-columns: 1fr;
+        gap: 1.2rem;
+    }
+
+    .meta {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .refresh-button {
+        width: 100%;
+        justify-content: center;
+        margin-left: 0;
+    }
+
+    .audio-player {
+        right: 0.8rem;
+        left: 0.8rem;
+        max-width: none;
+        padding: 1.1rem 1.2rem 1.2rem;
+    }
+}
+
+/* Tablet Portrait */
+@media (min-width: 641px) and (max-width: 768px) {
+    .page-shell {
+        padding: 2.5rem 1.5rem 2.5rem;
+    }
+
+    .controls {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .panel__grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.3rem;
+    }
+}
+
+/* Tablet Landscape */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .page-shell {
+        padding: 3rem 2rem 2.5rem;
+    }
+
+    .controls {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .panel__grid {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+}
+
+/* Legacy mobile styles for compatibility */
+@media (max-width: 640px) {
+    .panel .card:not(.skeleton) {
         opacity: 1;
         transform: none;
-        box-shadow: none;
+        transition-delay: 0ms;
     }
 
     .panel__header {
@@ -1246,35 +1437,7 @@ body[data-theme="light"] .floating-heading {
     .panel__audio-button {
         width: 100%;
         justify-content: center;
-        font-size: clamp(1.2rem, 6vw, 1.8rem);
-    }
-
-    .panel__grid {
-        grid-template-columns: 1fr;
-    }
-
-    .panel .card:not(.skeleton) {
-        opacity: 1;
-        transform: none;
-        transition-delay: 0ms;
-    }
-
-    .meta {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .refresh-button {
-        width: 100%;
-        justify-content: center;
-        margin-left: 0;
-    }
-
-    .audio-player {
-        right: 1rem;
-        left: 1rem;
-        max-width: none;
-        padding: 1.1rem 1.2rem 1.2rem;
+        font-size: clamp(1.1rem, 5vw, 1.6rem);
     }
 }
 

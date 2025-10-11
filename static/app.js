@@ -157,9 +157,9 @@ if (audioSkipRightControl) {
 // Add keyboard support for audio skipping
 document.addEventListener("keydown", (event) => {
     // Only handle keyboard shortcuts when audio player is visible and not typing in inputs
-    if (audioPlayerShell && !audioPlayerShell.hidden && 
+    if (audioPlayerShell && !audioPlayerShell.hidden &&
         !event.target.matches('input, textarea, [contenteditable]')) {
-        
+
         if (event.key === "ArrowLeft" && !event.ctrlKey && !event.metaKey && !event.altKey) {
             event.preventDefault();
             skipToPreviousAudio();
@@ -984,10 +984,10 @@ function setCurrentAudioFeed(feedUrl) {
 
 function getAvailableAudioFeeds() {
     const availableFeeds = [];
-    
+
     // Get all panels in the order they appear on screen
     const panels = Array.from(document.querySelectorAll('.panel[data-feed-url]'));
-    
+
     panels.forEach(panel => {
         const feedUrl = panel.dataset.feedUrl;
         if (feedUrl) {
@@ -1002,38 +1002,38 @@ function getAvailableAudioFeeds() {
             }
         }
     });
-    
+
     return availableFeeds;
 }
 
 function getCurrentAudioIndex() {
     const availableFeeds = getAvailableAudioFeeds();
     const currentFeed = state.currentAudioFeed;
-    
+
     if (!currentFeed) {
         return -1;
     }
-    
+
     return availableFeeds.findIndex(feed => feed.feedUrl === currentFeed);
 }
 
 function skipToPreviousAudio() {
     const availableFeeds = getAvailableAudioFeeds();
-    
+
     if (availableFeeds.length <= 1) {
         return; // No other audio to skip to
     }
-    
+
     const currentIndex = getCurrentAudioIndex();
     let previousIndex;
-    
+
     if (currentIndex <= 0) {
         // If at the beginning or no current audio, go to the last one
         previousIndex = availableFeeds.length - 1;
     } else {
         previousIndex = currentIndex - 1;
     }
-    
+
     const previousFeed = availableFeeds[previousIndex];
     if (previousFeed) {
         const status = state.audioStatuses.get(previousFeed.feedUrl);
@@ -1045,21 +1045,21 @@ function skipToPreviousAudio() {
 
 function skipToNextAudio() {
     const availableFeeds = getAvailableAudioFeeds();
-    
+
     if (availableFeeds.length <= 1) {
         return; // No other audio to skip to
     }
-    
+
     const currentIndex = getCurrentAudioIndex();
     let nextIndex;
-    
+
     if (currentIndex >= availableFeeds.length - 1 || currentIndex === -1) {
         // If at the end or no current audio, go to the first one
         nextIndex = 0;
     } else {
         nextIndex = currentIndex + 1;
     }
-    
+
     const nextFeed = availableFeeds[nextIndex];
     if (nextFeed) {
         const status = state.audioStatuses.get(nextFeed.feedUrl);
@@ -1073,27 +1073,27 @@ function updateSkipButtonStates() {
     const availableFeeds = getAvailableAudioFeeds();
     const hasMultipleFeeds = availableFeeds.length > 1;
     const currentIndex = getCurrentAudioIndex();
-    
+
     if (audioSkipLeftControl) {
         audioSkipLeftControl.disabled = !hasMultipleFeeds;
-        
+
         if (hasMultipleFeeds && currentIndex >= 0) {
             const prevIndex = currentIndex <= 0 ? availableFeeds.length - 1 : currentIndex - 1;
             const prevFeed = availableFeeds[prevIndex];
-            audioSkipLeftControl.setAttribute('aria-label', 
+            audioSkipLeftControl.setAttribute('aria-label',
                 `Skip to previous audio: ${prevFeed ? prevFeed.title : 'Previous'}`);
         } else {
             audioSkipLeftControl.setAttribute('aria-label', 'Skip to previous audio');
         }
     }
-    
+
     if (audioSkipRightControl) {
         audioSkipRightControl.disabled = !hasMultipleFeeds;
-        
+
         if (hasMultipleFeeds && currentIndex >= 0) {
             const nextIndex = currentIndex >= availableFeeds.length - 1 ? 0 : currentIndex + 1;
             const nextFeed = availableFeeds[nextIndex];
-            audioSkipRightControl.setAttribute('aria-label', 
+            audioSkipRightControl.setAttribute('aria-label',
                 `Skip to next audio: ${nextFeed ? nextFeed.title : 'Next'}`);
         } else {
             audioSkipRightControl.setAttribute('aria-label', 'Skip to next audio');
@@ -1613,12 +1613,33 @@ function createArticleCard(article) {
     const card = document.createElement("article");
     card.className = "card";
 
+    // Debug: Uncomment to log article image data
+    // console.log("Article image data:", article.title, "->", article.image);
+
     const media = document.createElement("div");
     media.className = "card__media";
     if (article.image) {
         const img = document.createElement("img");
-        // img.src = article.image;
         const upgraded = article.image.replace(/^http:\/\//i, "https://");
+
+        // Add error handling for image loading
+        img.onerror = function () {
+            console.log("Failed to load image:", upgraded);
+            // Try a different fallback image service
+            const fallbackUrl = `https://picsum.photos/400/300?grayscale&blur=1&random=${Math.floor(Math.random() * 1000)}`;
+            if (img.src !== fallbackUrl) {
+                img.src = fallbackUrl;
+            } else {
+                // If even the fallback fails, show a styled placeholder
+                media.classList.add("card__media--empty");
+                media.innerHTML = '<span>📰</span>';
+            }
+        };
+
+        img.onload = function () {
+            // console.log("Successfully loaded image:", upgraded);
+        };
+
         img.src = upgraded;
         img.alt = article.title ? `Image for ${article.title}` : "Story image";
         media.appendChild(img);
