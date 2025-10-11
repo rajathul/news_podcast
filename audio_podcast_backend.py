@@ -189,7 +189,10 @@ class AudioPodcastManager:
         if self._client is None:
             if genai is None:
                 raise RuntimeError("google-genai package not available; disable PODCAST_FAKE_AUDIO or install dependency.")
-            self._client = genai.Client()
+            api_key = os.getenv("GOOGLE_API_KEY")
+            if not api_key:
+                raise RuntimeError("GOOGLE_API_KEY environment variable not set")
+            self._client = genai.Client(api_key=api_key)
         return self._client
 
     async def ensure_audio(self, feed_url: str, channel_title: str, articles: List[Dict[str, str]]) -> AudioJob:
