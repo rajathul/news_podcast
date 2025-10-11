@@ -26,8 +26,8 @@ USER_AGENT = (
 )
 REQUEST_TIMEOUT_SECONDS = 10
 NAMESPACES = {
-    "media": "http://search.yahoo.com/mrss/",
-    "dc": "http://purl.org/dc/elements/1.1/",
+    "media": "https://search.yahoo.com/mrss/",
+    "dc": "https://purl.org/dc/elements/1.1/",
 }
 
 
