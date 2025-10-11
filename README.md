@@ -51,12 +51,6 @@ uvicorn rss_viewer:app --reload
 
 The app will listen on http://127.0.0.1:8000 by default. Open that URL in your browser.
 
-## Troubleshooting
-
-- If you get import errors, make sure the virtual environment is activated and `pip install -r requirements.txt` completed without errors.
-- If port 8000 is already in use, pass `--port` to `uvicorn` or change the `docker run -p` mapping.
-- If you run into audio generation issues, check `static/podcasts/` for produced files and review the logs printed by `audio_podcast_backend.py`.
-
 ## Notes
 
 - This README provides quick start instructions only. For development or deployment tweaks (SSL, reverse proxy, CI), adapt the Dockerfile and run commands accordingly.
