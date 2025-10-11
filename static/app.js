@@ -1086,7 +1086,7 @@ function createPanel(articles, panelMeta = {}) {
     headerText.appendChild(eyebrow);
     const title = document.createElement("h3");
     title.className = "panel__title";
-    title.textContent = panelTitle;
+    title.textContent = panelTitle || "Loading feed";
     headerText.appendChild(title);
     header.appendChild(headerText);
 
@@ -1403,10 +1403,17 @@ function renderSkeletonPanels(panelCount = 1) {
         panel.className = "panel panel--loading is-active";
         const header = document.createElement("div");
         header.className = "panel__header";
-        header.innerHTML = `
-            <span class="panel__eyebrow">Feed focus</span>
-            <h3 class="panel__title">Loading feed</h3>
-        `;
+        const headerText = document.createElement("div");
+        headerText.className = "panel__header-text";
+        const eyebrow = document.createElement("span");
+        eyebrow.className = "panel__eyebrow";
+        eyebrow.textContent = "Feed focus";
+        headerText.appendChild(eyebrow);
+        const title = document.createElement("h3");
+        title.className = "panel__title";
+        title.textContent = "Loading feed";
+        headerText.appendChild(title);
+        header.appendChild(headerText);
         panel.appendChild(header);
         const grid = document.createElement("div");
         grid.className = "panel__grid";
