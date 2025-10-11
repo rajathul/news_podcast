@@ -38,7 +38,7 @@ body[data-theme="light"] {
     --text-primary: #111111;
     --text-secondary: rgba(17, 17, 17, 0.75);
     --text-muted: rgba(17, 17, 17, 0.5);
-    --accent: #1c42ff;
+    --accent: #72bcd4;
     --accent-strong: #ff2d55;
     --shadow-hard: drop-shadow(6px 8px 0 rgba(0, 0, 0, 0.12));
 }
@@ -1129,6 +1129,7 @@ body[data-theme="light"] .floating-heading {
     background: transparent;
     cursor: pointer;
     position: relative;
+    color: #000;
 }
 
 .history-popup__close::before,
@@ -1195,6 +1196,7 @@ body[data-theme="light"] .floating-heading {
     letter-spacing: 0.08em;
     font-weight: 600;
     cursor: pointer;
+    color: #000;
 }
 
 .footer {

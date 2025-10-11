@@ -795,9 +795,6 @@ function updateAudioPlayerStatusText() {
     updateAudioProgressUI(currentSeconds, durationSeconds);
 
     const isPlaying = !audioPlayer.paused && !audioPlayer.ended;
-    const current = formatClockTime(currentSeconds);
-    const duration =
-        Number.isFinite(durationSeconds) && durationSeconds > 0 ? formatClockTime(durationSeconds) : "--:--";
     const statusLabel = audioPlayer.ended
         ? "Finished"
         : isPlaying
@@ -805,7 +802,7 @@ function updateAudioPlayerStatusText() {
             : currentSeconds > 0
                 ? "Paused"
                 : "Ready";
-    audioPlayerStatus.textContent = `${statusLabel} • ${current} / ${duration}`;
+    audioPlayerStatus.textContent = statusLabel;
     updateAudioToggleControl(isPlaying, Boolean(audioPlayer.currentSrc));
 }
 
