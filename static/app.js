@@ -42,6 +42,8 @@ const audioProgressDuration = document.getElementById("audioProgressDuration");
 const audioToggleControl = document.getElementById("audioToggleControl");
 const audioStopControl = document.getElementById("audioStopControl");
 const audioCloseControl = document.getElementById("audioCloseControl");
+const audioSkipLeftControl = document.getElementById("audioSkipLeftControl");
+const audioSkipRightControl = document.getElementById("audioSkipRightControl");
 const audioProgressVisualizer = document.getElementById("audioProgressVisualizer");
 const audioProgressBars = audioProgressVisualizer
     ? Array.from(audioProgressVisualizer.querySelectorAll(".audio-progress-visualizer__line"))
@@ -139,6 +141,34 @@ if (audioCloseControl) {
         stopAudioPlayback();
     });
 }
+
+if (audioSkipLeftControl) {
+    audioSkipLeftControl.addEventListener("click", () => {
+        skipToPreviousAudio();
+    });
+}
+
+if (audioSkipRightControl) {
+    audioSkipRightControl.addEventListener("click", () => {
+        skipToNextAudio();
+    });
+}
+
+// Add keyboard support for audio skipping
+document.addEventListener("keydown", (event) => {
+    // Only handle keyboard shortcuts when audio player is visible and not typing in inputs
+    if (audioPlayerShell && !audioPlayerShell.hidden && 
+        !event.target.matches('input, textarea, [contenteditable]')) {
+        
+        if (event.key === "ArrowLeft" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+            event.preventDefault();
+            skipToPreviousAudio();
+        } else if (event.key === "ArrowRight" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+            event.preventDefault();
+            skipToNextAudio();
+        }
+    }
+});
 
 if (audioProgress) {
     audioProgress.style.setProperty("--progress-ratio", "0");
@@ -436,6 +466,7 @@ function refreshRenderedAudioButtons() {
     buttons.forEach(button => {
         updateAudioButtonElement(button);
     });
+    updateSkipButtonStates();
 }
 
 function updateAudioButtonElement(button) {
@@ -922,18 +953,152 @@ function setCurrentAudioFeed(feedUrl) {
     }
     state.currentAudioFeed = feedUrl;
 
-    if (previousFeed && previousFeed !== feedUrl) {
+    // Remove active class from previous panel
+    if (previousFeed) {
+        const previousPanel = document.querySelector(`.panel[data-feed-url="${escapeAttributeSelector(previousFeed)}"]`);
+        if (previousPanel) {
+            previousPanel.classList.remove('panel--audio-active');
+        }
         setPanelAudioButtonsVisibility(previousFeed, true);
     }
 
     if (feedUrl) {
+        // Add active class to current panel
+        const currentPanel = document.querySelector(`.panel[data-feed-url="${escapeAttributeSelector(feedUrl)}"]`);
+        if (currentPanel) {
+            currentPanel.classList.add('panel--audio-active');
+        }
         setPanelAudioButtonsVisibility(feedUrl, false);
         openAudioPlayerShell(feedUrl, getAudioTitle(feedUrl));
     } else {
+        // Remove active class from all panels
+        document.querySelectorAll('.panel--audio-active').forEach(panel => {
+            panel.classList.remove('panel--audio-active');
+        });
         revealAllPanelAudioButtons();
         hideAudioPlayerShell();
     }
     refreshRenderedAudioButtons();
+    updateSkipButtonStates();
+}
+
+function getAvailableAudioFeeds() {
+    const availableFeeds = [];
+    
+    // Get all panels in the order they appear on screen
+    const panels = Array.from(document.querySelectorAll('.panel[data-feed-url]'));
+    
+    panels.forEach(panel => {
+        const feedUrl = panel.dataset.feedUrl;
+        if (feedUrl) {
+            const status = state.audioStatuses.get(feedUrl);
+            // Only include feeds that have ready audio
+            if (status && status.status === 'ready' && status.audio_url) {
+                availableFeeds.push({
+                    feedUrl,
+                    title: getAudioTitle(feedUrl),
+                    panel
+                });
+            }
+        }
+    });
+    
+    return availableFeeds;
+}
+
+function getCurrentAudioIndex() {
+    const availableFeeds = getAvailableAudioFeeds();
+    const currentFeed = state.currentAudioFeed;
+    
+    if (!currentFeed) {
+        return -1;
+    }
+    
+    return availableFeeds.findIndex(feed => feed.feedUrl === currentFeed);
+}
+
+function skipToPreviousAudio() {
+    const availableFeeds = getAvailableAudioFeeds();
+    
+    if (availableFeeds.length <= 1) {
+        return; // No other audio to skip to
+    }
+    
+    const currentIndex = getCurrentAudioIndex();
+    let previousIndex;
+    
+    if (currentIndex <= 0) {
+        // If at the beginning or no current audio, go to the last one
+        previousIndex = availableFeeds.length - 1;
+    } else {
+        previousIndex = currentIndex - 1;
+    }
+    
+    const previousFeed = availableFeeds[previousIndex];
+    if (previousFeed) {
+        const status = state.audioStatuses.get(previousFeed.feedUrl);
+        if (status && status.audio_url) {
+            playPanelAudio(previousFeed.feedUrl, status, previousFeed.title);
+        }
+    }
+}
+
+function skipToNextAudio() {
+    const availableFeeds = getAvailableAudioFeeds();
+    
+    if (availableFeeds.length <= 1) {
+        return; // No other audio to skip to
+    }
+    
+    const currentIndex = getCurrentAudioIndex();
+    let nextIndex;
+    
+    if (currentIndex >= availableFeeds.length - 1 || currentIndex === -1) {
+        // If at the end or no current audio, go to the first one
+        nextIndex = 0;
+    } else {
+        nextIndex = currentIndex + 1;
+    }
+    
+    const nextFeed = availableFeeds[nextIndex];
+    if (nextFeed) {
+        const status = state.audioStatuses.get(nextFeed.feedUrl);
+        if (status && status.audio_url) {
+            playPanelAudio(nextFeed.feedUrl, status, nextFeed.title);
+        }
+    }
+}
+
+function updateSkipButtonStates() {
+    const availableFeeds = getAvailableAudioFeeds();
+    const hasMultipleFeeds = availableFeeds.length > 1;
+    const currentIndex = getCurrentAudioIndex();
+    
+    if (audioSkipLeftControl) {
+        audioSkipLeftControl.disabled = !hasMultipleFeeds;
+        
+        if (hasMultipleFeeds && currentIndex >= 0) {
+            const prevIndex = currentIndex <= 0 ? availableFeeds.length - 1 : currentIndex - 1;
+            const prevFeed = availableFeeds[prevIndex];
+            audioSkipLeftControl.setAttribute('aria-label', 
+                `Skip to previous audio: ${prevFeed ? prevFeed.title : 'Previous'}`);
+        } else {
+            audioSkipLeftControl.setAttribute('aria-label', 'Skip to previous audio');
+        }
+    }
+    
+    if (audioSkipRightControl) {
+        audioSkipRightControl.disabled = !hasMultipleFeeds;
+        
+        if (hasMultipleFeeds && currentIndex >= 0) {
+            const nextIndex = currentIndex >= availableFeeds.length - 1 ? 0 : currentIndex + 1;
+            const nextFeed = availableFeeds[nextIndex];
+            audioSkipRightControl.setAttribute('aria-label', 
+                `Skip to next audio: ${nextFeed ? nextFeed.title : 'Next'}`);
+        } else {
+            audioSkipRightControl.setAttribute('aria-label', 'Skip to next audio');
+        }
+    }
 }
 
 function render() {

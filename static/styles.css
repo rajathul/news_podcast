@@ -1848,6 +1848,41 @@ body[data-theme="light"] .audio-progress-visualizer__line::after {
     color: var(--bg-body);
 }
 
+.audio-player__button--skip {
+    flex: 0 0 auto;
+    padding: 0.9rem;
+    min-width: 3rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.audio-player__button--skip svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    fill: currentColor;
+}
+
+.audio-player__button--skip:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.audio-player__button--skip:disabled svg {
+    opacity: 0.5;
+}
+
+.panel--audio-active {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent) !important;
+}
+
+.panel--audio-active .panel__eyebrow {
+    background: color-mix(in srgb, var(--accent) 25%, var(--bg-panel) 75%);
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
 @keyframes audioPlayerGradient {
     from {
         transform: rotate(0deg) scale(1.1);
