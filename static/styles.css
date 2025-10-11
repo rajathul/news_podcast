@@ -1382,6 +1382,13 @@ body[data-theme="light"] .floating-heading {
     justify-content: space-between;
     align-items: center;
     gap: 0.75rem;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+}
+
+.audio-player.is-dragging .audio-player__header {
+    cursor: grabbing;
 }
 
 .audio-player__badge {

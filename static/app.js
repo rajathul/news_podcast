@@ -46,6 +46,7 @@ const audioProgressVisualizer = document.getElementById("audioProgressVisualizer
 const audioProgressBars = audioProgressVisualizer
     ? Array.from(audioProgressVisualizer.querySelectorAll(".audio-progress-visualizer__line"))
     : [];
+const audioPlayerDragHandle = audioPlayerShell?.querySelector(".audio-player__header");
 const floatingHeading = document.createElement("div");
 floatingHeading.id = "floatingHeading";
 floatingHeading.className = "floating-heading";
@@ -55,6 +56,21 @@ if (audioProgressBars.length) {
     updateAudioVisualizerBars(0, false);
 }
 audioProgressVisualizer?.style.setProperty("--visualizer-progress", "0");
+
+const audioPlayerDragState = {
+    active: false,
+    pointerId: null,
+    offsetX: 0,
+    offsetY: 0,
+    width: 0,
+    height: 0
+};
+
+const DRAG_MARGIN = 12;
+
+if (audioPlayerDragHandle && audioPlayerShell) {
+    audioPlayerDragHandle.addEventListener("pointerdown", handleAudioPlayerDragStart);
+}
 
 sourcesList.addEventListener("click", handleSourceFilterInteraction);
 sourcesList.addEventListener("keydown", event => {
@@ -783,6 +799,10 @@ function hideAudioPlayerShell() {
     audioPlayerShell.classList.remove("audio-player--active", "audio-player--playing");
     body?.classList.remove("has-active-audio-player");
     setAudioVisualizerRatio(0, false);
+    audioPlayerShell.style.removeProperty("left");
+    audioPlayerShell.style.removeProperty("top");
+    audioPlayerShell.style.removeProperty("right");
+    audioPlayerShell.style.removeProperty("bottom");
     syncAudioPlayerVisualState();
 }
 
@@ -1264,6 +1284,82 @@ function updatePanelProgressValues() {
         floatingHeading.hidden = true;
     }
 }
+
+function handleAudioPlayerDragStart(event) {
+    if (!audioPlayerShell) {
+        return;
+    }
+    if (event.button !== undefined && event.button !== 0) {
+        return;
+    }
+    if (event.target.closest(".audio-player__close")) {
+        return;
+    }
+    const rect = audioPlayerShell.getBoundingClientRect();
+    audioPlayerShell.style.right = "auto";
+    audioPlayerShell.style.bottom = "auto";
+    audioPlayerShell.style.left = `${rect.left}px`;
+    audioPlayerShell.style.top = `${rect.top}px`;
+
+    audioPlayerDragState.active = true;
+    audioPlayerDragState.pointerId = event.pointerId;
+    audioPlayerDragState.offsetX = event.clientX - rect.left;
+    audioPlayerDragState.offsetY = event.clientY - rect.top;
+    audioPlayerDragState.width = rect.width;
+    audioPlayerDragState.height = rect.height;
+
+    audioPlayerShell.classList.add("is-dragging");
+    audioPlayerShell.setPointerCapture?.(event.pointerId);
+    window.addEventListener("pointermove", handleAudioPlayerDragMove);
+    window.addEventListener("pointerup", handleAudioPlayerDragEnd);
+    window.addEventListener("pointercancel", handleAudioPlayerDragEnd);
+    event.preventDefault();
+}
+
+function handleAudioPlayerDragMove(event) {
+    if (!audioPlayerShell || !audioPlayerDragState.active || event.pointerId !== audioPlayerDragState.pointerId) {
+        return;
+    }
+    const maxLeft = Math.max(DRAG_MARGIN, window.innerWidth - audioPlayerDragState.width - DRAG_MARGIN);
+    const maxTop = Math.max(DRAG_MARGIN, window.innerHeight - audioPlayerDragState.height - DRAG_MARGIN);
+    const nextLeft = clamp(event.clientX - audioPlayerDragState.offsetX, DRAG_MARGIN, maxLeft);
+    const nextTop = clamp(event.clientY - audioPlayerDragState.offsetY, DRAG_MARGIN, maxTop);
+    audioPlayerShell.style.left = `${nextLeft}px`;
+    audioPlayerShell.style.top = `${nextTop}px`;
+}
+
+function handleAudioPlayerDragEnd(event) {
+    if (!audioPlayerShell || !audioPlayerDragState.active || event.pointerId !== audioPlayerDragState.pointerId) {
+        return;
+    }
+    audioPlayerDragState.active = false;
+    audioPlayerShell.classList.remove("is-dragging");
+    audioPlayerShell.releasePointerCapture?.(event.pointerId);
+    window.removeEventListener("pointermove", handleAudioPlayerDragMove);
+    window.removeEventListener("pointerup", handleAudioPlayerDragEnd);
+    window.removeEventListener("pointercancel", handleAudioPlayerDragEnd);
+    constrainAudioPlayerToViewport();
+}
+
+function constrainAudioPlayerToViewport() {
+    if (!audioPlayerShell) {
+        return;
+    }
+    const rect = audioPlayerShell.getBoundingClientRect();
+    const maxLeft = Math.max(DRAG_MARGIN, window.innerWidth - rect.width - DRAG_MARGIN);
+    const maxTop = Math.max(DRAG_MARGIN, window.innerHeight - rect.height - DRAG_MARGIN);
+    const clampedLeft = clamp(rect.left, DRAG_MARGIN, maxLeft);
+    const clampedTop = clamp(rect.top, DRAG_MARGIN, maxTop);
+    audioPlayerShell.style.left = `${clampedLeft}px`;
+    audioPlayerShell.style.top = `${clampedTop}px`;
+}
+
+window.addEventListener("resize", () => {
+    if (!audioPlayerShell || audioPlayerShell.hidden || !audioPlayerShell.style.left) {
+        return;
+    }
+    constrainAudioPlayerToViewport();
+});
 
 function clamp01(value) {
     if (value < 0) return 0;
