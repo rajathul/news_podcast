@@ -375,7 +375,7 @@ class AudioPodcastManager:
             return [job.to_dict() for job in self._jobs.values()]
 
 
-audio_manager = AudioPodcastManager(use_fake_audio=True)
+audio_manager = AudioPodcastManager()
 
 
 async def ensure_audio_for_feed(feed_url: str, channel_title: str, articles: List[Dict[str, str]]) -> Dict[str, Optional[str]]:
