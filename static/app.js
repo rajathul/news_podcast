@@ -2177,4 +2177,31 @@ document.querySelectorAll(".preset-feed-button").forEach(button => {
 applyTheme(loadThemePreference());
 updateSourcesList();
 renderHistoryPopup();
-loadArticles();
+
+// Add the NYT feed as default when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if no feeds are currently loaded
+    if (state.sources.length === 0) {
+        // Add the NYT World News feed as default
+        const nytFeedUrl = "https://rss.nytimes.com/services/xml/rss/nyt/World.xml";
+        const nytFeedName = "NYT - World News";
+        
+        const existingSource = state.sources.find(source => source.feed === nytFeedUrl);
+        if (!existingSource) {
+            const newSource = createSource({
+                feed: nytFeedUrl,
+                title: nytFeedName,
+                url: nytFeedUrl
+            });
+            state.sources.push(newSource);
+        }
+        
+        // Update the preset button to show as active
+        const nytButton = document.querySelector(`.preset-feed-button[data-feed="${nytFeedUrl}"]`);
+        if (nytButton) {
+            nytButton.classList.add("is-active");
+        }
+    }
+    
+    loadArticles();
+});
