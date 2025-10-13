@@ -1,4 +1,4 @@
-# News Podcast
+# AudioTorial
 https://audiotorial-431874109903.europe-west1.run.app/
 
 A tiny web app that fetches news (via RSS), generates podcast audio files, and serves them. The repository includes a small FastAPI app (`rss_viewer.py`), an audio backend script (`audio_podcast_backend.py`), static assets and generated podcasts.
