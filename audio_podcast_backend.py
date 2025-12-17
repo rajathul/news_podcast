@@ -189,9 +189,9 @@ class AudioPodcastManager:
         if self._client is None:
             if genai is None:
                 raise RuntimeError("google-genai package not available; disable PODCAST_FAKE_AUDIO or install dependency.")
-            api_key = os.getenv("GOOGLE_API_KEY")
+            api_key = os.getenv("GEMINI_API_KEY")
             if not api_key:
-                raise RuntimeError("GOOGLE_API_KEY environment variable not set")
+                raise RuntimeError("GEMINI_API_KEY environment variable not set")
             self._client = genai.Client(api_key=api_key)
         return self._client
 
