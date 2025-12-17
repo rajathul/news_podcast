@@ -19,7 +19,7 @@ from google.genai import types
 
 LOGGER = logging.getLogger("audio_podcast_backend")
 
-TRANSCRIPT_MODEL = "gemini-2.0-flash"
+TRANSCRIPT_MODEL = "gemini-2.5-flash"
 TTS_MODEL = "gemini-2.5-flash-preview-tts"
 OUTPUT_DIR = Path("static/podcasts")
 MAX_PROMPT_ARTICLES = 8
