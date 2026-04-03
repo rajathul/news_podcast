@@ -1,5 +1,7 @@
 const API_ENDPOINT = "/api/articles";
 const AUDIO_STATUS_ENDPOINT = "/api/audio/status";
+const DIGEST_ENDPOINT = "/api/digest";
+const DIGEST_FEED_KEY = "digest://daily";
 const AUDIO_POLL_INTERVAL = 5000;
 
 const STORAGE_KEYS = {
@@ -1891,11 +1893,11 @@ function toggleAddFeedForm(show) {
 }
 
 function updatePresetButtonStates() {
-    document.querySelectorAll(".preset-feed-button").forEach(button => {
-        const feedUrl = button.dataset.feed;
-        const isActive = state.sources.some(source => source.feed === feedUrl);
-        button.classList.toggle("is-active", isActive);
-    });
+    const digestButton = document.getElementById("dailyDigestButton");
+    if (digestButton) {
+        const isDigestActive = state.sources.length === 1 && state.sources[0].feed === DIGEST_FEED_KEY;
+        digestButton.classList.toggle("is-active", isDigestActive);
+    }
 }
 
 function handlePresetFeedClick(event) {
@@ -1931,6 +1933,89 @@ function handlePresetFeedClick(event) {
             state.sources.push(newSource);
             loadArticles(true);
         }
+    }
+}
+
+async function handleDigestClick() {
+    const button = document.getElementById("dailyDigestButton");
+    const isDigestActive = state.sources.length === 1 && state.sources[0].feed === DIGEST_FEED_KEY;
+
+    if (isDigestActive) {
+        state.sources = [];
+        state.items = [];
+        state.feedErrors = [];
+        if (button) button.classList.remove("is-active");
+        updateSourcesList();
+        panelsContainer.innerHTML = "";
+        emptyState.hidden = true;
+        toggleError(false);
+        statusHeadline.textContent = "Add a feed URL to load stories.";
+        lastRefreshed.dateTime = "";
+        lastRefreshed.textContent = "";
+        detachPanelProgressListeners();
+        floatingHeading.hidden = true;
+        return;
+    }
+
+    state.sources = [createSource({ feed: DIGEST_FEED_KEY, title: "Daily Digest", url: DIGEST_FEED_KEY })];
+    if (button) button.classList.add("is-active");
+    renderSkeletonPanels(3);
+    statusHeadline.textContent = "Loading Daily Digest…";
+    toggleError(false);
+    emptyState.hidden = true;
+    refreshButton.disabled = true;
+
+    try {
+        const response = await fetch(DIGEST_ENDPOINT);
+        if (!response.ok) throw new Error(`Request failed with status ${response.status}`);
+        const payload = await response.json();
+
+        const sections = Array.isArray(payload.sections) ? payload.sections : [];
+        const source = state.sources[0];
+        const aggregated = [];
+
+        sections.forEach(section => {
+            const items = Array.isArray(section.items) ? section.items : [];
+            items.forEach(item => {
+                aggregated.push({
+                    ...item,
+                    sourceId: source.id,
+                    sourceTitle: "Daily Digest",
+                    sourceUrl: DIGEST_FEED_KEY,
+                    sourceFeed: DIGEST_FEED_KEY,
+                });
+            });
+        });
+
+        state.items = aggregated;
+        state.feedErrors = [];
+
+        const counts = new Map([[source.id, aggregated.length]]);
+        updateSourcesList(counts);
+        updatePresetButtonStates();
+        updateTimestamp(new Date());
+
+        rememberAudioTitle(DIGEST_FEED_KEY, "Daily Digest");
+        if (payload.audio && typeof payload.audio === "object") {
+            if (!payload.audio.feed) payload.audio.feed = DIGEST_FEED_KEY;
+            upsertAudioStatus(DIGEST_FEED_KEY, payload.audio);
+        } else {
+            requestAudioStatus(DIGEST_FEED_KEY);
+        }
+        scheduleAudioPolling(DIGEST_FEED_KEY);
+
+        render();
+    } catch (error) {
+        console.error("Failed to load Daily Digest:", error);
+        state.items = [];
+        state.feedErrors = [{ source: state.sources[0], error }];
+        toggleError(true);
+        statusHeadline.textContent = "Unable to load Daily Digest.";
+        panelsContainer.innerHTML = "";
+        detachPanelProgressListeners();
+        floatingHeading.hidden = true;
+    } finally {
+        refreshButton.disabled = false;
     }
 }
 
@@ -2169,39 +2254,30 @@ historyPopup.addEventListener("click", event => {
     }
 });
 
-// Add preset feed button handlers
-document.querySelectorAll(".preset-feed-button").forEach(button => {
-    button.addEventListener("click", handlePresetFeedClick);
-});
+// Daily Digest button
+document.getElementById("dailyDigestButton")?.addEventListener("click", handleDigestClick);
+
+// Digest info tooltip toggle
+const digestInfoButton = document.getElementById("digestInfoButton");
+const digestTooltip = document.getElementById("digestTooltip");
+if (digestInfoButton && digestTooltip) {
+    digestInfoButton.addEventListener("click", event => {
+        event.stopPropagation();
+        const isHidden = digestTooltip.hidden;
+        digestTooltip.hidden = !isHidden;
+        digestInfoButton.setAttribute("aria-expanded", String(!isHidden));
+    });
+    document.addEventListener("click", () => {
+        digestTooltip.hidden = true;
+        digestInfoButton.setAttribute("aria-expanded", "false");
+    });
+}
 
 applyTheme(loadThemePreference());
 updateSourcesList();
 renderHistoryPopup();
 
-// Add the NYT feed as default when the page loads
+// Load Daily Digest by default on page load
 document.addEventListener('DOMContentLoaded', function() {
-    // Check if no feeds are currently loaded
-    if (state.sources.length === 0) {
-        // Add the NYT World News feed as default
-        const nytFeedUrl = "https://rss.nytimes.com/services/xml/rss/nyt/World.xml";
-        const nytFeedName = "NYT - World News";
-        
-        const existingSource = state.sources.find(source => source.feed === nytFeedUrl);
-        if (!existingSource) {
-            const newSource = createSource({
-                feed: nytFeedUrl,
-                title: nytFeedName,
-                url: nytFeedUrl
-            });
-            state.sources.push(newSource);
-        }
-        
-        // Update the preset button to show as active
-        const nytButton = document.querySelector(`.preset-feed-button[data-feed="${nytFeedUrl}"]`);
-        if (nytButton) {
-            nytButton.classList.add("is-active");
-        }
-    }
-    
-    loadArticles();
+    handleDigestClick();
 });

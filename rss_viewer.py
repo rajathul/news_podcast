@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import re
+
+from dotenv import load_dotenv
+load_dotenv()
 from datetime import datetime, timezone
 from html import unescape
 from typing import Any, Dict, List, Optional, Tuple
@@ -15,10 +18,18 @@ from starlette.requests import Request
 
 from audio_podcast_backend import (
     ensure_audio_for_feed,
+    ensure_digest_audio_for_feeds,
     get_all_audio_statuses,
     get_audio_status,
 )
 
+
+DIGEST_FEEDS = [
+    ("World News", "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"),
+    ("Markets & Finance", "https://feeds.ft.com/rss/home/uk"),
+    ("Sports", "http://feeds.bbci.co.uk/sport/rss.xml"),
+    ("Entertainment", "https://variety.com/feed/"),
+]
 
 USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -196,6 +207,31 @@ async def audio_status(feed: Optional[str] = Query(None)) -> Dict[str, Any]:
     if feed:
         return await get_audio_status(feed.strip())
     return {"items": await get_all_audio_statuses()}
+
+
+@app.get("/api/digest")
+async def get_digest() -> Dict[str, Any]:
+    sections = []
+    errors = []
+    for section_name, feed_url in DIGEST_FEEDS:
+        try:
+            _, articles = await fetch_articles(feed_url)
+            sections.append((section_name, feed_url, articles))
+        except Exception as exc:
+            errors.append({"section": section_name, "feed": feed_url, "error": str(exc)})
+
+    if not sections:
+        raise HTTPException(status_code=502, detail="All digest feeds failed to load.")
+
+    audio_job = await ensure_digest_audio_for_feeds(sections)
+    return {
+        "sections": [
+            {"name": name, "feed": url, "items": articles, "item_count": len(articles)}
+            for name, url, articles in sections
+        ],
+        "errors": errors,
+        "audio": audio_job,
+    }
 
 
 @app.get("/healthz")

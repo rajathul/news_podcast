@@ -62,33 +62,29 @@
                 <div class="control-group control-group--actions">
                     <span class="control-label">Sources</span>
                     <div class="preset-feeds">
-                        <button type="button" class="preset-feed-button"
-                            data-feed="https://rss.nytimes.com/services/xml/rss/nyt/World.xml"
-                            data-name="NYT - World News">
-                            NYT - World News
-                        </button>
-                        <button type="button" class="preset-feed-button"
-                            data-feed="https://www.ft.com/markets?format=rss" data-name="FT - Markets">
-                            FT - Markets
-                        </button>
-                        <button type="button" class="preset-feed-button"
-                            data-feed="https://feeds.feedburner.com/ndtvnews-top-stories" data-name="NDTV - India">
-                            NDTV - India
-                        </button>
-                        <button type="button" class="preset-feed-button"
-                            data-feed="https://feeds.bbci.co.uk/sport/rss.xml" data-name="BBC Sports">
-                            BBC Sports
-                        </button>
-                        <button type="button" class="preset-feed-button"
-                            data-feed="https://feeds.feedburner.com/variety/headlines"
-                            data-name="Variety Entertainment">
-                            Variety Entertainment
-                        </button>
-                        <button type="button" class="preset-feed-button"
-                            data-feed="https://frontline.thehindu.com/politics/feeder/default.rss"
-                            data-name="Indian Politics">
-                            Indian Politics
-                        </button>
+                        <div class="daily-digest-wrapper">
+                            <button type="button" class="preset-feed-button preset-feed-button--digest"
+                                id="dailyDigestButton">
+                                Daily Digest
+                            </button>
+                            <button type="button" class="digest-info-button" id="digestInfoButton"
+                                aria-label="What's in the Daily Digest" aria-expanded="false"
+                                aria-controls="digestTooltip">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path
+                                        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+                                </svg>
+                            </button>
+                            <div class="digest-tooltip" id="digestTooltip" role="tooltip" hidden>
+                                <strong>Daily Digest includes:</strong>
+                                <ul>
+                                    <li>NYT World News</li>
+                                    <li>Financial Times Markets</li>
+                                    <li>BBC Sports News</li>
+                                    <li>Variety Entertainment</li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                     <div class="add-feed">
                         <button type="button" class="add-feed__toggle" id="addFeedButton">
