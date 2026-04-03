@@ -454,6 +454,84 @@ a {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
+.daily-digest-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.digest-info-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 50%;
+    transition: color var(--transition), transform var(--transition);
+    flex-shrink: 0;
+}
+
+.digest-info-button:hover {
+    color: var(--accent);
+    transform: scale(1.15);
+}
+
+.digest-info-button svg {
+    width: 1rem;
+    height: 1rem;
+    fill: currentColor;
+    pointer-events: none;
+}
+
+.digest-tooltip {
+    position: absolute;
+    top: calc(100% + 0.6rem);
+    left: 0;
+    z-index: 200;
+    background: var(--bg-elevated);
+    border: 2px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    padding: 0.8rem 1rem;
+    min-width: 230px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+    font-size: 0.8rem;
+    color: var(--text-primary);
+}
+
+.digest-tooltip strong {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.digest-tooltip ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.digest-tooltip li {
+    color: var(--text-secondary);
+    padding-left: 1rem;
+    position: relative;
+}
+
+.digest-tooltip li::before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+}
+
 .add-feed {
     display: flex;
     flex-direction: column;

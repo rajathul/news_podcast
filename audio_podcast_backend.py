@@ -12,7 +12,7 @@ import time
 import wave
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 from google import genai
 from google.genai import types
 
@@ -23,6 +23,9 @@ TRANSCRIPT_MODEL = "gemini-2.5-flash"
 TTS_MODEL = "gemini-2.5-flash-preview-tts"
 OUTPUT_DIR = Path("static/podcasts")
 MAX_PROMPT_ARTICLES = 8
+MAX_DIGEST_ARTICLES_PER_SECTION = 10
+DIGEST_FEED_URL = "digest://daily"
+DIGEST_META_PATH = OUTPUT_DIR / "digest_meta.json"
 DEFAULT_SPEAKERS = (
     ("Anya", "Kore"),
     ("Liam", "Puck"),
@@ -124,9 +127,9 @@ def _articles_digest(articles: Iterable[Dict[str, str]]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _articles_prompt_snippet(articles: List[Dict[str, str]]) -> str:
+def _articles_prompt_snippet(articles: List[Dict[str, str]], limit: int = MAX_PROMPT_ARTICLES) -> str:
     lines = []
-    for idx, article in enumerate(articles[:MAX_PROMPT_ARTICLES], start=1):
+    for idx, article in enumerate(articles[:limit], start=1):
         title = (article.get("title") or "").strip()
         desc = (article.get("description") or "").strip()
         lines.append(f"{idx}. {title}\nSummary: {desc}")
@@ -147,6 +150,7 @@ class AudioJob:
     error: Optional[str] = None
     updated_at: float = field(default_factory=time.time)
     task: Optional[asyncio.Task] = None
+    sections: Optional[List[Tuple[str, List[Dict[str, str]]]]] = None
 
     def to_dict(self) -> Dict[str, Optional[str]]:
         return {
@@ -184,16 +188,17 @@ class AudioPodcastManager:
         return _env_fake_audio_flag()
 
     def _client_guard(self) -> genai.Client:
-        if self._using_fake_audio():
-            raise RuntimeError("Client guard should not be used when fake audio is enabled.")
         if self._client is None:
             if genai is None:
-                raise RuntimeError("google-genai package not available; disable PODCAST_FAKE_AUDIO or install dependency.")
+                raise RuntimeError("google-genai package not available; install dependency.")
             api_key = os.getenv("GEMINI_API_KEY")
             if not api_key:
                 raise RuntimeError("GEMINI_API_KEY environment variable not set")
             self._client = genai.Client(api_key=api_key)
         return self._client
+
+    def _has_api_key(self) -> bool:
+        return bool(os.getenv("GEMINI_API_KEY"))
 
     async def ensure_audio(self, feed_url: str, channel_title: str, articles: List[Dict[str, str]]) -> AudioJob:
         content_hash = _articles_digest(articles)
@@ -224,18 +229,29 @@ class AudioPodcastManager:
         job.updated_at = time.time()
         try:
             fake_audio_mode = self._using_fake_audio()
+            use_real_transcript = self._has_api_key()
             LOGGER.info(
-                "Starting %s audio generation for feed %s",
-                "fake" if fake_audio_mode else "Gemini",
+                "Starting job for feed %s (transcript=%s, tts=%s)",
                 job.feed_url,
+                "gemini" if use_real_transcript else "dummy",
+                "skipped" if fake_audio_mode else "gemini",
             )
-            if fake_audio_mode:
+
+            # Transcript — real if API key present, dummy otherwise
+            if use_real_transcript:
+                if job.sections:
+                    transcript = await asyncio.to_thread(self._generate_digest_transcript, job.sections)
+                else:
+                    transcript = await asyncio.to_thread(self._generate_transcript, job.channel_title, job.articles)
+            else:
                 transcript = self._generate_dummy_transcript(job.channel_title, job.articles)
-                job.transcript = transcript
+            job.transcript = transcript
+            print(f"\n{'=' * 60}\nPODCAST SCRIPT — {job.channel_title}\n{'=' * 60}\n{transcript}\n{'=' * 60}\n")
+
+            # Audio — skip TTS when fake mode is on
+            if fake_audio_mode:
                 audio_bytes, mime_type = self._generate_dummy_audio(transcript)
             else:
-                transcript = await asyncio.to_thread(self._generate_transcript, job.channel_title, job.articles)
-                job.transcript = transcript
                 audio_bytes, mime_type = await asyncio.to_thread(self._synthesise_audio, transcript)
             audio_bytes, mime_type = await asyncio.to_thread(_normalise_audio_bytes, audio_bytes, mime_type)
             audio_path = self._write_audio(job.feed_url, audio_bytes, mime_type)
@@ -244,6 +260,8 @@ class AudioPodcastManager:
             job.audio_mime_type = mime_type
             job.status = "ready"
             job.updated_at = time.time()
+            if job.feed_url == DIGEST_FEED_URL:
+                self._save_digest_meta(job)
             LOGGER.info(
                 "Completed %s audio generation for %s (%s)",
                 "fake" if fake_audio_mode else "Gemini",
@@ -279,6 +297,49 @@ class AudioPodcastManager:
         )
         if not response.text:
             raise ValueError("Transcript generation returned empty content.")
+        return response.text.strip()
+
+    def _generate_digest_transcript(self, sections: List[Tuple[str, List[Dict[str, str]]]]) -> str:
+        if genai is None or types is None:
+            raise RuntimeError("google-genai package is required for real transcript generation.")
+        section_blocks = []
+        for section_name, articles in sections:
+            snippet = _articles_prompt_snippet(articles[:MAX_DIGEST_ARTICLES_PER_SECTION], limit=MAX_DIGEST_ARTICLES_PER_SECTION)
+            section_blocks.append(f"[{section_name.upper()}]\n{snippet}")
+        sections_text = "\n\n---\n\n".join(section_blocks)
+        prompt = (
+            "You are writing a daily morning news podcast script for two anchors:\n"
+            "- Liam: calm, authoritative, strong on geopolitics and context. Gives depth and weight to big stories.\n"
+            "- Anya: sharp, witty, great at finding surprising angles, human stakes, and keeping energy high.\n\n"
+            "The podcast covers four sections in this order:\n"
+            "1. World News\n"
+            "2. Markets & Finance\n"
+            "3. Sports\n"
+            "4. Entertainment\n\n"
+            "Guidelines:\n"
+            "- From the articles provided, pick the 4-5 most significant and interesting stories per section.\n"
+            "  Prioritise: stories with wide impact, breaking developments, surprising twists, or strong human angles.\n"
+            "  Skip filler, routine updates, or stories with no compelling hook.\n"
+            "- Open with a punchy intro — Liam sets the stage, Anya immediately pulls the listener in with something unexpected.\n"
+            "- Give each story the space it deserves: a major geopolitical event warrants more depth than a sports result.\n"
+            "  Let important stories breathe with analysis and reaction; lighter stories can be punchy and quick.\n"
+            "- Transition between sections with a line that naturally bridges the themes\n"
+            "  (e.g. 'Those geopolitical tremors are already rattling currency markets, Anya...').\n"
+            "- Let personality drive the script: Liam provides context and stakes, Anya adds wit, a fresh angle, or a moment of levity.\n"
+            "  Let them disagree, riff off each other, or react genuinely — it should feel like a real conversation, not a readout.\n"
+            "- End with a memorable sign-off that ties the day's themes together and leaves the listener feeling informed.\n"
+            "- Write as much as the stories demand. Do not pad, but do not rush a story that deserves more.\n"
+            "- Format strictly as: 'Liam: ...' or 'Anya: ...' — one speaker per line, no stage directions or section headers.\n\n"
+            f"TODAY'S STORIES:\n\n{sections_text}\n"
+        )
+        LOGGER.info("Requesting Gemini digest transcript with %d sections", len(sections))
+        client = self._client_guard()
+        response = client.models.generate_content(
+            model=self.transcript_model,
+            contents=prompt,
+        )
+        if not response.text:
+            raise ValueError("Digest transcript generation returned empty content.")
         return response.text.strip()
 
     def _synthesise_audio(self, transcript: str) -> tuple[bytes, str]:
@@ -349,6 +410,85 @@ class AudioPodcastManager:
         }
         return mapping.get(mime_type.lower(), ".mp3")
 
+    def _save_digest_meta(self, job: AudioJob) -> None:
+        try:
+            meta = {
+                "date_utc": time.strftime("%Y-%m-%d", time.gmtime()),
+                "audio_filename": job.audio_path.name if job.audio_path else None,
+                "audio_mime_type": job.audio_mime_type,
+                "transcript": job.transcript,
+            }
+            DIGEST_META_PATH.write_text(json.dumps(meta))
+            LOGGER.info("Digest metadata saved for %s", meta["date_utc"])
+        except Exception:
+            LOGGER.warning("Failed to save digest metadata", exc_info=True)
+
+    def _load_cached_digest_job(self) -> Optional[AudioJob]:
+        try:
+            if not DIGEST_META_PATH.exists():
+                return None
+            meta = json.loads(DIGEST_META_PATH.read_text())
+            if meta.get("date_utc") != time.strftime("%Y-%m-%d", time.gmtime()):
+                LOGGER.info("Cached digest is from a previous day — will regenerate")
+                return None
+            audio_filename = meta.get("audio_filename")
+            if not audio_filename:
+                return None
+            audio_path = self.output_dir / audio_filename
+            if not audio_path.exists():
+                LOGGER.info("Cached digest audio file missing — will regenerate")
+                return None
+            job = AudioJob(
+                feed_url=DIGEST_FEED_URL,
+                channel_title="Daily Digest",
+                content_hash="",
+                articles=[],
+            )
+            job.status = "ready"
+            job.audio_path = audio_path
+            job.audio_url = f"/static/podcasts/{audio_filename}"
+            job.audio_mime_type = meta.get("audio_mime_type")
+            job.transcript = meta.get("transcript")
+            LOGGER.info("Restored digest from local cache (date: %s)", meta["date_utc"])
+            return job
+        except Exception:
+            LOGGER.warning("Failed to load digest metadata", exc_info=True)
+            return None
+
+    async def ensure_digest_audio(self, sections: List[Tuple[str, str, List[Dict[str, str]]]]) -> AudioJob:
+        """sections: list of (section_name, feed_url, articles)"""
+        async with self._jobs_lock:
+            cached = self._load_cached_digest_job()
+            if cached:
+                self._jobs[DIGEST_FEED_URL] = cached
+                return cached
+
+        all_articles = [article for _, _, articles in sections for article in articles]
+        content_hash = _articles_digest(all_articles)
+        section_data: List[Tuple[str, List[Dict[str, str]]]] = [(name, articles) for name, _, articles in sections]
+        async with self._jobs_lock:
+            job = self._jobs.get(DIGEST_FEED_URL)
+            if job and job.content_hash == content_hash:
+                if job.status in {"pending", "generating"} and job.task and not job.task.done():
+                    return job
+                if job.status == "ready" and job.audio_path and job.audio_path.exists():
+                    return job
+                if job.status == "error":
+                    LOGGER.info("Retrying digest audio generation")
+            elif job and job.content_hash != content_hash:
+                if job.task and not job.task.done():
+                    job.task.cancel()
+            job = AudioJob(
+                feed_url=DIGEST_FEED_URL,
+                channel_title="Daily Digest",
+                content_hash=content_hash,
+                articles=all_articles,
+                sections=section_data,
+            )
+            job.task = asyncio.create_task(self._run_job(job))
+            self._jobs[DIGEST_FEED_URL] = job
+            return job
+
     async def get_status(self, feed_url: str) -> Dict[str, Optional[str]]:
         async with self._jobs_lock:
             job = self._jobs.get(feed_url)
@@ -389,3 +529,8 @@ async def get_audio_status(feed_url: str) -> Dict[str, Optional[str]]:
 
 async def get_all_audio_statuses() -> List[Dict[str, Optional[str]]]:
     return await audio_manager.list_statuses()
+
+
+async def ensure_digest_audio_for_feeds(sections: List[Tuple[str, str, List[Dict[str, str]]]]) -> Dict[str, Optional[str]]:
+    job = await audio_manager.ensure_digest_audio(sections)
+    return job.to_dict()
