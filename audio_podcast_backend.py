@@ -412,31 +412,39 @@ class AudioPodcastManager:
 
     def _save_digest_meta(self, job: AudioJob) -> None:
         try:
+            import storage as _storage
+            audio_filename = job.audio_path.name if job.audio_path else None
+            audio_url = job.audio_url
+            if job.audio_path and audio_filename:
+                audio_url = _storage.upload_file(job.audio_path, audio_filename)
             meta = {
                 "date_utc": time.strftime("%Y-%m-%d", time.gmtime()),
-                "audio_filename": job.audio_path.name if job.audio_path else None,
+                "created_at": time.time(),
+                "audio_url": audio_url,
                 "audio_mime_type": job.audio_mime_type,
                 "transcript": job.transcript,
             }
-            DIGEST_META_PATH.write_text(json.dumps(meta))
-            LOGGER.info("Digest metadata saved for %s", meta["date_utc"])
+            _storage.upload_json(meta, "digest_meta.json")
+            LOGGER.info("Digest metadata saved to Supabase for %s", meta["date_utc"])
         except Exception:
-            LOGGER.warning("Failed to save digest metadata", exc_info=True)
+            LOGGER.warning("Failed to save digest metadata to Supabase", exc_info=True)
 
     def _load_cached_digest_job(self) -> Optional[AudioJob]:
         try:
-            if not DIGEST_META_PATH.exists():
+            import storage as _storage
+            meta = _storage.download_json("digest_meta.json")
+            if not meta:
                 return None
-            meta = json.loads(DIGEST_META_PATH.read_text())
-            if meta.get("date_utc") != time.strftime("%Y-%m-%d", time.gmtime()):
-                LOGGER.info("Cached digest is from a previous day — will regenerate")
+            created_at = meta.get("created_at", 0)
+            age_hours = (time.time() - created_at) / 3600
+            date_matches = meta.get("date_utc") == time.strftime("%Y-%m-%d", time.gmtime())
+            # Serve cache if: same calendar day, OR less than 4 hours old (covers midnight edge case)
+            if not date_matches and age_hours >= 4:
+                print(f"[Digest Cache] Stale — date={meta.get('date_utc')}, age={age_hours:.1f}h — regenerating fresh digest")
                 return None
-            audio_filename = meta.get("audio_filename")
-            if not audio_filename:
-                return None
-            audio_path = self.output_dir / audio_filename
-            if not audio_path.exists():
-                LOGGER.info("Cached digest audio file missing — will regenerate")
+            audio_url = meta.get("audio_url")
+            if not audio_url:
+                print("[Digest Cache] No audio URL in metadata — regenerating")
                 return None
             job = AudioJob(
                 feed_url=DIGEST_FEED_URL,
@@ -445,14 +453,14 @@ class AudioPodcastManager:
                 articles=[],
             )
             job.status = "ready"
-            job.audio_path = audio_path
-            job.audio_url = f"/static/podcasts/{audio_filename}"
+            job.audio_url = audio_url
             job.audio_mime_type = meta.get("audio_mime_type")
             job.transcript = meta.get("transcript")
-            LOGGER.info("Restored digest from local cache (date: %s)", meta["date_utc"])
+            print(f"[Digest Cache] HIT — serving from Supabase (date={meta.get('date_utc')}, age={age_hours:.1f}h)")
+            print(f"[Digest Cache] Audio URL: {audio_url}")
             return job
         except Exception:
-            LOGGER.warning("Failed to load digest metadata", exc_info=True)
+            LOGGER.warning("Failed to load digest metadata from Supabase", exc_info=True)
             return None
 
     async def ensure_digest_audio(self, sections: List[Tuple[str, str, List[Dict[str, str]]]]) -> AudioJob:
@@ -462,6 +470,7 @@ class AudioPodcastManager:
             if cached:
                 self._jobs[DIGEST_FEED_URL] = cached
                 return cached
+            print("[Digest Cache] MISS — generating fresh digest")
 
         all_articles = [article for _, _, articles in sections for article in articles]
         content_hash = _articles_digest(all_articles)
